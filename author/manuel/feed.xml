@@ -1,0 +1,1543 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<feed xmlns="http://www.w3.org/2005/Atom" >
+  <generator uri="https://jekyllrb.com/" version="3.8.5">Jekyll</generator>
+  <link href="https://manuelvivo.dev/author/manuel/feed.xml" rel="self" type="application/atom+xml" />
+  <link href="https://manuelvivo.dev/" rel="alternate" type="text/html" />
+  <updated>2020-12-17T13:00:13+00:00</updated>
+  <id>https://manuelvivo.dev/author/manuel/feed.xml</id>
+
+  
+  
+  
+
+  
+    <title type="html">Manuel Vivo .dev | </title>
+  
+
+  
+    <subtitle>A place where you can learn about Android development</subtitle>
+  
+
+  
+
+  
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  
+
+  
+  
+
+  
+    <entry>
+      <title type="html">Simplifying APIs with coroutines and Flow</title>
+      <link href="https://manuelvivo.dev/simplifying-apis-coroutines" rel="alternate" type="text/html" title="Simplifying APIs with coroutines and Flow" />
+      <published>2020-12-16T00:00:00+00:00</published>
+      <updated>2020-12-16T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/simplifying-apis-coroutines</id>
+      <content type="html" xml:base="https://manuelvivo.dev/simplifying-apis-coroutines">&lt;p&gt;Learn how to create your own coroutine adapters and see how they work under the hood&lt;/p&gt;
+
+&lt;p&gt;If you’re a library author, you might want to make your Java-based or callback-based libraries easier to consume from Kotlin using coroutines and Flow. Alternatively, if you’re an API consumer, you may be willing to adapt a 3rd party API surface to coroutines to make them more Kotlin friendly.&lt;/p&gt;
+
+&lt;p&gt;This article covers how to simplify APIs using coroutines and Flow as well as how to build your own adapter using &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; APIs. For the most curious ones, those APIs will be dissected and you’ll see how they work under the hood.&lt;/p&gt;
+
+&lt;p&gt;If you prefer to watch a video about this topic, check this one out:&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/OmHePYcHbyQ&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h2 id=&quot;check-existing-coroutine-adapters&quot;&gt;Check existing coroutine adapters&lt;/h2&gt;
+
+&lt;p&gt;Before writing your own wrappers for existing APIs, check if an adapter or &lt;a href=&quot;https://medium.com/androiddevelopers/extend-your-code-readability-with-kotlin-extensions-542bf702aa36&quot;&gt;extension function&lt;/a&gt; is available for your use case. There are existing libraries with coroutine adapters for common types.&lt;/p&gt;
+
+&lt;h3 id=&quot;future-types&quot;&gt;Future types&lt;/h3&gt;
+
+&lt;p&gt;For future types, there are integrations for Java 8’s &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/integration/kotlinx-coroutines-jdk8/src/future/Future.kt&quot;&gt;CompletableFuture&lt;/a&gt;, and Guava’s &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/integration/kotlinx-coroutines-guava/src/ListenableFuture.kt&quot;&gt;ListenableFuture&lt;/a&gt;. This is not an exhaustive list, search online if an adapter for your future type already exists.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Awaits completion of CompletionStage without blocking a thread&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;CompletionStage&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;await&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt; 
+
+&lt;span class=&quot;c1&quot;&gt;// Awaits completion of ListenableFuture without blocking a thread&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;ListenableFuture&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;await&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;With these functions, you can get rid of callbacks and just suspend the coroutine until the future result comes back.&lt;/p&gt;
+
+&lt;h3 id=&quot;reactive-streams&quot;&gt;Reactive Streams&lt;/h3&gt;
+
+&lt;p&gt;For reactive stream libraries, there are integrations for &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/tree/master/reactive/kotlinx-coroutines-rx3&quot;&gt;RxJava&lt;/a&gt;, &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/tree/master/reactive/kotlinx-coroutines-jdk9&quot;&gt;Java 9 APIs&lt;/a&gt;, and &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/tree/master/reactive/kotlinx-coroutines-reactive&quot;&gt;reactive streams&lt;/a&gt; libraries.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Transforms the given reactive Publisher into Flow.&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;err&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Any&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;Publisher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;asFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;These functions convert a reactive stream into Flow.&lt;/p&gt;
+
+&lt;h3 id=&quot;android-specific-apis&quot;&gt;Android specific APIs&lt;/h3&gt;
+
+&lt;p&gt;For Jetpack libraries or Android platform APIs, take a look at the &lt;a href=&quot;https://developer.android.com/kotlin/ktx/extensions-list&quot;&gt;Jetpack KTX libraries list&lt;/a&gt;. Currently, more than 20 libraries have a KTX version, creating sweet idiomatic versions of Java APIs, ranging from SharedPreferences to ViewModels, SQLite and even Play Core.&lt;/p&gt;
+
+&lt;h3 id=&quot;callbacks&quot;&gt;Callbacks&lt;/h3&gt;
+
+&lt;p&gt;Callbacks are a very common solution for asynchronous communication. In fact, we use them for the Java programming language solution in the &lt;a href=&quot;https://developer.android.com/guide/background/threading&quot;&gt;Running tasks in background thread guide&lt;/a&gt;. However, they come with some drawbacks: this design leads to nested callbacks which ends up in incomprehensible code. Also, error handling is more complicated as there isn’t an easy way to propagate them.&lt;/p&gt;
+
+&lt;p&gt;In Kotlin, you can simplify calling callbacks using coroutines, but for that, you’ll need to build your own adapter.&lt;/p&gt;
+
+&lt;h2 id=&quot;build-your-own-adapter&quot;&gt;Build your own adapter&lt;/h2&gt;
+
+&lt;p&gt;If you don’t find an adapter for your use case, it’s usually quite straightforward to write your own. &lt;strong&gt;For one-shot async calls, use the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/suspend-cancellable-coroutine.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt;&lt;/a&gt; API. For streaming data, use the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/callback-flow.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt;&lt;/a&gt; API&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;As an exercise, the following examples will use the &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient.html&quot;&gt;Fused Location Provider&lt;/a&gt; API from Google Play Services to get location data. The API surface is simple but it uses callbacks to perform async operations. With coroutines, we can get rid of those callbacks that can quickly make our code unreadable when the logic gets complicated.&lt;/p&gt;
+
+&lt;p&gt;In case you want to explore other solutions, you can get inspiration from the source code of all the functions linked above.&lt;/p&gt;
+
+&lt;h3 id=&quot;one-shot-async-calls&quot;&gt;One-shot async calls&lt;/h3&gt;
+
+&lt;p&gt;The &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient.html&quot;&gt;Fused Location Provider&lt;/a&gt; API provides the &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient#getLastLocation()&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;getLastLocation&lt;/code&gt;&lt;/a&gt; method to obtain the &lt;a href=&quot;https://developer.android.com/training/location/retrieve-current&quot;&gt;last known location&lt;/a&gt;. The ideal API for coroutines is a suspend function that returns exactly that.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Note that this API returns a &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/tasks/Task&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Task&lt;/code&gt;&lt;/a&gt; and there’s already an &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/integration/kotlinx-coroutines-play-services/src/Tasks.kt&quot;&gt;adapter&lt;/a&gt; available for it. However, for learning purposes, we’ll use it as an example.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;We can have a better API by creating an extension function on &lt;code class=&quot;highlighter-rouge&quot;&gt;FusedLocationProviderClient&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;awaitLastLocation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;As this is a one-shot async operation, we use the &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; function: a low-level building block for creating suspending functions from the coroutines library.&lt;/p&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; executes the block of code passed to it as a parameter, then suspends the coroutine execution while waiting for the signal to continue. The coroutine will resume executing when the &lt;code class=&quot;highlighter-rouge&quot;&gt;resume&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;resumeWithException&lt;/code&gt; method is called in the coroutine’s &lt;a href=&quot;https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.coroutines/-continuation/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Continuation&lt;/code&gt;&lt;/a&gt; object. For more information about continuations, check out the &lt;em&gt;&lt;a href=&quot;https://manuelvivo.dev/suspend-modifier&quot;&gt;suspend modifier under the hood article&lt;/a&gt;&lt;/em&gt;.&lt;/p&gt;
+
+&lt;p&gt;We use the callbacks that can be added to the &lt;code class=&quot;highlighter-rouge&quot;&gt;getLastLocation&lt;/code&gt; method to resume the coroutine appropriately. See the implementation below:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Extension function on FusedLocationProviderClient, returns last known location&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;awaitLastLocation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// Create a new coroutine that can be cancelled&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;suspendCancellableCoroutine&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;continuation&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Add listeners that will resume the execution of this coroutine&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;lastLocation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;addOnSuccessListener&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;location&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+      &lt;span class=&quot;c1&quot;&gt;// Resume coroutine and return location&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;continuation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;resume&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;addOnFailureListener&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;e&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+      &lt;span class=&quot;c1&quot;&gt;// Resume the coroutine by throwing an exception&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;continuation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;resumeWithException&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// End of the suspendCancellableCoroutine block. This suspends the&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// coroutine until one of the callbacks calls the continuation parameter.&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Note: Although you will also find a non-cancellable version of this coroutine builder in the coroutines library (i.e. &lt;a href=&quot;https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.coroutines/suspend-coroutine.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCoroutine&lt;/code&gt;&lt;/a&gt;), it is preferable to always choose &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/suspend-cancellable-coroutine.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt;&lt;/a&gt; to handle cancellation of the coroutine scope, or to propagate cancellation from the underlying API.&lt;/p&gt;
+
+&lt;h4 id=&quot;suspendcancellablecoroutine-under-the-hood&quot;&gt;suspendCancellableCoroutine under the hood&lt;/h4&gt;
+
+&lt;p&gt;Internally, &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/CancellableContinuation.kt#L305&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt;&lt;/a&gt; uses &lt;a href=&quot;https://github.com/JetBrains/kotlin/blob/master/libraries/stdlib/src/kotlin/coroutines/intrinsics/Intrinsics.kt#L41&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCoroutineUninterceptedOrReturn&lt;/code&gt;&lt;/a&gt; to get the &lt;code class=&quot;highlighter-rouge&quot;&gt;Continuation&lt;/code&gt; of the coroutine inside a suspend function. That &lt;code class=&quot;highlighter-rouge&quot;&gt;Continuation&lt;/code&gt; object is intercepted by a &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/CancellableContinuation.kt&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CancellableContinuation&lt;/code&gt;&lt;/a&gt; that will control the lifecycle of that coroutine from that point (its &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/CancellableContinuationImpl.kt&quot;&gt;implementation&lt;/a&gt; has the functionality of a &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; with some restrictions).&lt;/p&gt;
+
+&lt;p&gt;After that, the lambda passed to &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; will be executed and the coroutine will either resume immediately if the lambda returns a result or will be suspended until the &lt;code class=&quot;highlighter-rouge&quot;&gt;CancellableContinuation&lt;/code&gt; is resumed manually from the lambda.&lt;/p&gt;
+
+&lt;p&gt;See my own comments in the following code snippet (following the &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/CancellableContinuation.kt#L305&quot;&gt;original implementation&lt;/a&gt;) to understand what’s happening:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;inline&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;suspendCancellableCoroutine&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;crossinline&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;block&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;CancellableContinuation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Unit&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;):&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// Get the Continuation object of the coroutine that it's running this suspend function&lt;/span&gt;
+  &lt;span class=&quot;nf&quot;&gt;suspendCoroutineUninterceptedOrReturn&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uCont&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Take over the control of the coroutine. The Continuation's been&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// intercepted and it follows the CancellableContinuationImpl lifecycle now&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;cancellable&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CancellableContinuationImpl&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;uCont&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;intercepted&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+ 
+    &lt;span class=&quot;c1&quot;&gt;// Call block of code with the cancellable continuation&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;block&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cancellable&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        
+    &lt;span class=&quot;c1&quot;&gt;// Either suspend the coroutine and wait for the Continuation to be resumed&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// manually in `block` or return a result if `block` has finished executing&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;cancellable&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;getResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To know more about how suspend functions work under the hood, check out the &lt;em&gt;&lt;a href=&quot;https://manuelvivo.dev/suspend-modifier&quot;&gt;suspend modifier under the hood article&lt;/a&gt;&lt;/em&gt;.&lt;/p&gt;
+
+&lt;h3 id=&quot;streaming-data&quot;&gt;Streaming data&lt;/h3&gt;
+
+&lt;p&gt;If instead we wanted to receive periodic location updates (using the &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient#requestLocationUpdates(com.google.android.gms.location.LocationRequest,%20com.google.android.gms.location.LocationCallback,%20android.os.Looper)&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;requestLocationUpdates&lt;/code&gt;&lt;/a&gt; function) whenever the user’s device moves in the real world, we’d need to create a stream of data using &lt;a href=&quot;https://kotlinlang.org/docs/reference/coroutines/flow.html&quot;&gt;Flow&lt;/a&gt;. The ideal API would look like this:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;locationFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To convert streaming callback-based APIs to Flow, use the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/callback-flow.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt;&lt;/a&gt; flow builder that creates a new flow. In the &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; lambda, we’re in the context of a coroutine, therefore, suspend functions can be called. Unlike the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/flow.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;flow&lt;/code&gt;&lt;/a&gt; flow builder, &lt;code class=&quot;highlighter-rouge&quot;&gt;channelFlow&lt;/code&gt; allows values to be emitted from a different &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; or outside a coroutine, with the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.channels/-send-channel/offer.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;offer&lt;/code&gt;&lt;/a&gt; method.&lt;/p&gt;
+
+&lt;p&gt;Normally, flow adapters using &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; follow these three generic steps:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;Create the callback that adds elements into the flow using &lt;code class=&quot;highlighter-rouge&quot;&gt;offer&lt;/code&gt;.&lt;/li&gt;
+  &lt;li&gt;Register the callback.&lt;/li&gt;
+  &lt;li&gt;Wait for the consumer to cancel the coroutine and unregister the callback.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Applying this recipe to this use case, we get the following implementation:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Send location updates to the consumer &lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;locationFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;callbackFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// A new Flow is created. This code executes in a coroutine!&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// 1. Create callback and add elements into the flow&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;callback&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;object&lt;/span&gt; &lt;span class=&quot;err&quot;&gt;: &lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;LocationCallback&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;onLocationResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;LocationResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;?)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;?:&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// Ignore null responses&lt;/span&gt;
+      &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;location&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;in&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;locations&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;try&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+          &lt;span class=&quot;nf&quot;&gt;offer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// Send location to the flow&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;catch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;t&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Throwable&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+          &lt;span class=&quot;c1&quot;&gt;// Location couldn't be sent to the flow &lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// 2. Register the callback to get location updates by calling requestLocationUpdates&lt;/span&gt;
+  &lt;span class=&quot;nf&quot;&gt;requestLocationUpdates&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;createLocationRequest&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;callback&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nc&quot;&gt;Looper&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;getMainLooper&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;addOnFailureListener&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;e&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;close&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// in case of error, close the Flow&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// 3. Wait for the consumer to cancel the coroutine and unregister&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// the callback. This suspends the coroutine until the Flow is closed.&lt;/span&gt;
+  &lt;span class=&quot;nf&quot;&gt;awaitClose&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Clean up code goes here&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;removeLocationUpdates&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;callback&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h4 id=&quot;callbackflow-under-the-hood&quot;&gt;callbackFlow under the hood&lt;/h4&gt;
+
+&lt;p&gt;Internally, &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; uses a &lt;a href=&quot;https://kotlinlang.org/docs/reference/coroutines/channels.html&quot;&gt;channel&lt;/a&gt;, which is conceptually very similar to a blocking &lt;a href=&quot;https://en.wikipedia.org/wiki/Queue_(abstract_data_type)&quot;&gt;queue&lt;/a&gt;. A channel is configured with a &lt;code class=&quot;highlighter-rouge&quot;&gt;capacity&lt;/code&gt;: the number of elements that can be buffered. The channel created in &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; has the default capacity of 64 elements. When adding a new element to an already full channel, &lt;code class=&quot;highlighter-rouge&quot;&gt;send&lt;/code&gt; will suspend the producer until there’s space for the new element in the channel whereas &lt;code class=&quot;highlighter-rouge&quot;&gt;offer&lt;/code&gt; won’t add the element to the channel and will return &lt;code class=&quot;highlighter-rouge&quot;&gt;false&lt;/code&gt; immediately.&lt;/p&gt;
+
+&lt;h4 id=&quot;awaitclose-under-the-hood&quot;&gt;awaitClose under the hood&lt;/h4&gt;
+
+&lt;p&gt;Interestingly, &lt;code class=&quot;highlighter-rouge&quot;&gt;awaitClose&lt;/code&gt; uses &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; under the hood. See my own comments in the following code snippet (following the &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/channels/Produce.kt#L49&quot;&gt;original implementation&lt;/a&gt;) to understand what’s happening:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;ProducerScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;*&amp;gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;awaitClose&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;block&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Unit&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{})&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;try&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Suspend the coroutine with a cancellable continuation&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;suspendCancellableCoroutine&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Unit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;cont&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+      &lt;span class=&quot;c1&quot;&gt;// Suspend forever and resume the coroutine successfully only &lt;/span&gt;
+      &lt;span class=&quot;c1&quot;&gt;// when the Flow/Channel is closed&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;invokeOnClose&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;cont&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;resume&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Unit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;finally&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Always execute caller's clean up code&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;block&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h4 id=&quot;reusing-the-flow&quot;&gt;Reusing the Flow&lt;/h4&gt;
+
+&lt;p&gt;Flows are cold and lazy unless specified otherwise with intermediate operators such as &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/conflate.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;conflate&lt;/code&gt;&lt;/a&gt;. This means that the builder block will be executed each time a terminal operator is called on the flow. This might not be a huge problem in our case as adding new location listeners is cheap, however, it might make a difference in other implementations.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;locationFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;callbackFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;shareIn&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// Make the flow follow the applicationScope&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;applicationScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// Emit the last emitted element to new collectors&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;replay&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// Keep the producer active while there are active subscribers&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;started&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SharingStarted&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;WhileSubscribed&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To learn more about best practices for adding an &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt; to your app, check out this &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-4&quot;&gt;article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Consider creating coroutine adapters to make your APIs or existing APIs concise, readable and Kotlin idiomatic. First check if the adapter is already available and if not, create your own using &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; for one-shot calls and &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; for streaming data.&lt;/p&gt;
+
+&lt;p&gt;To get hands-on this topic, check out the &lt;a href=&quot;https://codelabs.developers.google.com/codelabs/building-kotlin-extensions-library&quot;&gt;&lt;em&gt;Building a Kotlin extensions library&lt;/em&gt; codelab&lt;/a&gt;.&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Learn how to create your own coroutine adapters and see how they work under the hood</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Migrating from Dagger to Hilt — Is it worth it?</title>
+      <link href="https://manuelvivo.dev/migrating-to-Hilt" rel="alternate" type="text/html" title="Migrating from Dagger to Hilt — Is it worth it?" />
+      <published>2020-11-24T00:00:01+00:00</published>
+      <updated>2020-11-24T00:00:01+00:00</updated>
+      <id>https://manuelvivo.dev/migrating-to-Hilt</id>
+      <content type="html" xml:base="https://manuelvivo.dev/migrating-to-Hilt">&lt;p&gt;Consider whether or not you should migrate your Dagger app to Hilt&lt;/p&gt;
+
+&lt;p&gt;Hilt got released in June 2020 as a way to standardize dependency injection (DI) in Android. For new projects, Hilt provides compile time correctness, runtime performance and scalability (read more about that &lt;a href=&quot;https://manuelvivo.dev/di-with-hilt&quot;&gt;here&lt;/a&gt;)! However, what are the benefits for an application that already uses Dagger? &lt;strong&gt;Should you be migrating&lt;/strong&gt; your current app to Hilt? The following are some reasons whether your team should invest migrating from Dagger to Hilt.&lt;/p&gt;
+
+&lt;h2 id=&quot;-androidx-extensions&quot;&gt;✅ AndroidX extensions&lt;/h2&gt;
+
+&lt;p&gt;If you already have Dagger working with ViewModels or WorkManager, you saw that wiring up your ViewModelFactory and WorkerFactory requires quite a lot of boilerplate code and Dagger knowledge. The most common implementation uses &lt;a href=&quot;https://dagger.dev/dev-guide/multibindings.html&quot;&gt;multibindings&lt;/a&gt; which is one of the most complex features in Dagger that developers often struggle to understand. Hilt makes working with AndroidX a lot easier by removing that boilerplate code. What’s even better is that you don’t even need to inject the Factory in the Android framework class, you call it as if Hilt wasn’t there. With &lt;code class=&quot;highlighter-rouge&quot;&gt;@ViewModelInject&lt;/code&gt;, Hilt generates the right &lt;code class=&quot;highlighter-rouge&quot;&gt;ViewModelProvider.Factory&lt;/code&gt; for you that &lt;code class=&quot;highlighter-rouge&quot;&gt;@AndroidEntryPoint&lt;/code&gt; activities and fragments can use directly.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;PlayViewModel&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@ViewModelInject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;db&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MusicDatabase&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;nd&quot;&gt;@AndroidEntryPoint&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;PlayActivity&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AppCompatActivity&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;viewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;PlayViewModel&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;by&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewModels&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+
+  &lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;onCreate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;savedInstanceState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Bundle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;super&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;onCreate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;bundle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;viewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;play&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;-testing-apis&quot;&gt;✅ Testing APIs&lt;/h2&gt;
+
+&lt;p&gt;DI is supposed to make testing easier but ironically, having Dagger working in tests requires &lt;a href=&quot;https://developer.android.com/training/dependency-injection/dagger-android#dagger-testing&quot;&gt;a lot of work&lt;/a&gt;. The fact that you have to maintain both the prod and test Dagger graph at the same time makes it notably worse than &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-testing&quot;&gt;Hilt’s approach&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Hilt tests can explicitly modify the DI graph using the &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-testing#replace-binding&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;@UninstallModules&lt;/code&gt;&lt;/a&gt; functionality. Apart from that, you get other perks like &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-testing#binding-new&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;@BindValue&lt;/code&gt;&lt;/a&gt; that allows you to easily bind fields of your tests into the DI graph.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@UninstallModules&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;AnalyticsModule&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;class&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;nd&quot;&gt;@HiltAndroidTest&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleTest&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  
+  &lt;span class=&quot;err&quot;&gt;@&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Rule&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;hiltRule&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;HiltAndroidRule&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+  
+  &lt;span class=&quot;nd&quot;&gt;@BindValue&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@JvmField&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analyticsRepository&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FakeAnalyticsRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  
+  &lt;span class=&quot;nd&quot;&gt;@Test&lt;/span&gt; 
+  &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;myTest&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;..&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;-consistency&quot;&gt;✅ Consistency&lt;/h2&gt;
+
+&lt;p&gt;There are multiple ways to have the same functionality working in Dagger. The historical lack of guidance for Android apps (that we &lt;a href=&quot;https://developer.android.com/training/dependency-injection/dagger-basics&quot;&gt;tackled&lt;/a&gt; last year) has caused multiple debates in the community and ultimately created inconsistencies in the way developers use and set up Dagger in their Android apps.&lt;/p&gt;
+
+&lt;p&gt;You might argue that your current Dagger setup is really good and you perfectly know how everything works and how everything is getting injected. Therefore, migrating to Hilt is not worth it! That might be true in your case, but is it the same for the rest of the team (and potentially future colleagues)? Will you know how everything works when switching to a new project? Understanding the setup and usage of Dagger in an app can be challenging and time consuming.&lt;/p&gt;
+
+&lt;p&gt;That time can be dramatically reduced by using Hilt into your app as the same setup is used by all Hilt applications. A new developer joining your team won’t be surprised about your Hilt setup because it’ll be pretty much the same as what they’re used to.&lt;/p&gt;
+
+&lt;h2 id=&quot;-custom-components&quot;&gt;✅ Custom Components&lt;/h2&gt;
+
+&lt;p&gt;Apart from the defined standard components, Hilt also gives you a way to create custom components and add them to the hierarchy which you can read more about &lt;a href=&quot;https://manuelvivo.dev/hilt-adding-components&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Even though custom components reduce consistency, you still get a lot of benefits! The module auto-discoverability (i.e. the &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-android#hilt-modules&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;@InstallIn&lt;/code&gt;&lt;/a&gt; annotation functionality) feature as well as the test replacement features also work with custom components.&lt;/p&gt;
+
+&lt;p&gt;However, the difference between custom components and the Hilt built-in components is that you lose the ability to automatically inject those components into Android framework classes (i.e. what &lt;code class=&quot;highlighter-rouge&quot;&gt;@AndroidEntryPoint&lt;/code&gt; does).&lt;/p&gt;
+
+&lt;h2 id=&quot;-dagger-and-hilt-interop&quot;&gt;✅ Dagger and Hilt interop&lt;/h2&gt;
+
+&lt;p&gt;Hilt and Dagger can co-exist together! You can benefit from Hilt in certain parts of your app while keeping the other most niche parts using Dagger if you allow Hilt to take over your &lt;code class=&quot;highlighter-rouge&quot;&gt;SingletonComponent&lt;/code&gt;. This also means that the &lt;a href=&quot;https://codelabs.developers.google.com/codelabs/android-dagger-to-hilt#0&quot;&gt;migration to Hilt can be done gradually&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;-component-dependencies&quot;&gt;❌ Component dependencies&lt;/h2&gt;
+
+&lt;p&gt;Hilt being opinionated means it makes decisions for you. Hilt uses subcomponents for the component relationships, ready why &lt;a href=&quot;https://dagger.dev/hilt/monolithic&quot;&gt;here&lt;/a&gt;. If you’re a strong believer that your app is better off using component dependencies, Hilt is not the right tool for your app.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Migrating from Dagger to Hilt is worth it in most projects. The benefits Hilt brings to your application outnumbers the efforts of having to update. But you are not on your own! We provided lots of resources to help you out in this journey:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;Comprehensive migration &lt;a href=&quot;https://dagger.dev/hilt/migration-guide&quot;&gt;documentation&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Migrating from Dagger to Hilt &lt;a href=&quot;https://codelabs.developers.google.com/codelabs/android-dagger-to-hilt#0&quot;&gt;codelab&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Migrating the Google I/O app to Hilt &lt;a href=&quot;https://medium.com/androiddevelopers/migrating-the-google-i-o-app-to-hilt-f3edf03affe5&quot;&gt;blog post&lt;/a&gt; and &lt;a href=&quot;https://github.com/google/iosched/commit/9c20fdd52d446e5fdb03369e50fb196c31ae16e3&quot;&gt;commit&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Hilt and Assisted Injection working together &lt;a href=&quot;https://gist.github.com/manuelvicnt/437668cda3a891d347e134b1de29aee1&quot;&gt;gist&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Leave a comment below if you have any questions or you’re missing any more information about this!&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="hilt" />
+      
+
+      
+        <summary type="html">Consider whether or not you should migrate your Dagger app to Hilt</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Going with the Flow</title>
+      <link href="https://manuelvivo.dev/going-with-the-flow" rel="alternate" type="text/html" title="Going with the Flow" />
+      <published>2020-11-24T00:00:00+00:00</published>
+      <updated>2020-11-24T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/going-with-the-flow</id>
+      <content type="html" xml:base="https://manuelvivo.dev/going-with-the-flow">&lt;p&gt;Introduction to coroutines Flow&lt;/p&gt;
+
+&lt;h2 id=&quot;description&quot;&gt;Description&lt;/h2&gt;
+
+&lt;p&gt;Suspend functions in Coroutines are meant for one-shot calls that could return a result. But, how can you create a stream of data to return multiple results over time? In this video of Kotlin Vocabulary, Manuel will give us the benefits of Kotlin Flow, and much more!&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/emk9_tVVLcc&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h3 id=&quot;resources&quot;&gt;Resources&lt;/h3&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/35PMGrh&quot;&gt;The ABC of Coroutines episode&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://d.android.com/kotlin/flow&quot;&gt;Flow documentation&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2wHr94N&quot;&gt;Watch more Kotlin Vocabulary&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/AndroidDevs&quot;&gt;Subscribe to Android Developers&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="talks" />
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Introduction to coroutines Flow</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Scoping in Android and Hilt</title>
+      <link href="https://manuelvivo.dev/scoping-in-android" rel="alternate" type="text/html" title="Scoping in Android and Hilt" />
+      <published>2020-07-21T00:00:00+00:00</published>
+      <updated>2020-07-21T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/scoping-in-android</id>
+      <content type="html" xml:base="https://manuelvivo.dev/scoping-in-android">&lt;p&gt;Learn about scoping in Android and how that relates to scoping in Hilt&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Scoping&lt;/strong&gt; an object &lt;code class=&quot;highlighter-rouge&quot;&gt;A&lt;/code&gt; to another object &lt;code class=&quot;highlighter-rouge&quot;&gt;B&lt;/code&gt; means that throughout the lifecycle of &lt;code class=&quot;highlighter-rouge&quot;&gt;B&lt;/code&gt;, it’ll always have the same instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;A&lt;/code&gt;. When it comes to dependency injection (DI), an object &lt;code class=&quot;highlighter-rouge&quot;&gt;A&lt;/code&gt; scoped to a container means that the container will always provide the same instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;A&lt;/code&gt; until the container is destroyed.&lt;/p&gt;
+
+&lt;p&gt;In Hilt, you can scope types to containers or components using annotations. For example, let’s say your app has a &lt;code class=&quot;highlighter-rouge&quot;&gt;UserManager&lt;/code&gt; type that handles logins and logouts. You could scope this type to the &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt; (which is a container managed by the application’s lifecycle) using the &lt;code class=&quot;highlighter-rouge&quot;&gt;@Singleton&lt;/code&gt; annotation. The scoped types in the application component flow down the component hierarchy: in the example, the same instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;UserManager&lt;/code&gt; will be provided to the rest of the &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-android#component-hierarchy&quot;&gt;Hilt components in the hierarchy&lt;/a&gt;. Any type in the app that depends on &lt;code class=&quot;highlighter-rouge&quot;&gt;UserManager&lt;/code&gt; will receive the same instance.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Note: By default, bindings in Hilt are &lt;strong&gt;unscoped&lt;/strong&gt;. They are not part of any component and they can be accessed throughout the entire project. A different instance of that type will be provided every time it is requested. When you scope a binding to a component, it limits where that binding can be used and which dependencies the type can have.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h2 id=&quot;scoping-in-android&quot;&gt;Scoping in Android&lt;/h2&gt;
+
+&lt;p&gt;With the above definition, you could argue that you can scope a type by using an instance variable of that type in a specific class, and that’s true! Without DI, you could do something like this:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleActivity&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AppCompatActivity&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analyticsAdapter&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The &lt;code class=&quot;highlighter-rouge&quot;&gt;analyticsAdapter&lt;/code&gt; variable is scoped to &lt;code class=&quot;highlighter-rouge&quot;&gt;ExampleActivity&lt;/code&gt;’s lifecycle, which means it’ll be the same instance as long as this activity isn’t destroyed. If another class needs to access this scoped variable for some reason, they’ll get the same instance every time too. When a new instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;ExampleActivity&lt;/code&gt; is created (e.g. the activity goes through a configuration change), a new instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt; will be created.&lt;/p&gt;
+
+&lt;p&gt;With Hilt, the equivalent code is:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@ActivityScoped&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;nd&quot;&gt;@AndroidEntryPoint&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleActivity&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AppCompatActivity&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;lateinit&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analyticsAdapter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Every time &lt;code class=&quot;highlighter-rouge&quot;&gt;ExampleActivity&lt;/code&gt; is created, it’ll hold a new instance of the &lt;code class=&quot;highlighter-rouge&quot;&gt;ActivityComponent&lt;/code&gt; DI container that will provide the same instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt; to dependencies below it in the &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-android#component-hierarchy&quot;&gt;component hierarchy&lt;/a&gt; until the activity is destroyed.&lt;/p&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+  &lt;img src=&quot;assets/images/2020-07-21-scoping-in-android_1.png&quot; /&gt;
+  &lt;small&gt;You get a new instance of `AnalyticsAdapter` and `MainActivity` after a configuration change&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;h2 id=&quot;scoping-with-viewmodel&quot;&gt;Scoping with ViewModel&lt;/h2&gt;
+
+&lt;p&gt;However, we might want &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt; to survive configuration changes! We could say that we want to scope that instance to the activity until the user moves away from it.&lt;/p&gt;
+
+&lt;p&gt;For that, you can use an &lt;a href=&quot;https://developer.android.com/topic/libraries/architecture/viewmodel&quot;&gt;Architecture Components ViewModel&lt;/a&gt; because it survives configuration changes.&lt;/p&gt;
+
+&lt;p&gt;Without dependency injection, you could have this code:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analyticsAdapter&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleActivity&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AppCompatActivity&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;viewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleViewModel&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;by&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewModels&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analyticsAdapter&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;viewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;analyticsAdapter&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;And in this way, you scope the &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt; to the ViewModel. As the activity has access to the ViewModel, it can always grab the same instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;With Hilt, you could achieve the same behavior by scoping &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt; to the &lt;code class=&quot;highlighter-rouge&quot;&gt;ActivityRetainedComponent&lt;/code&gt; which also survives configuration changes:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@ActivityRetainedScoped&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;nd&quot;&gt;@AndroidEntryPoint&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleActivity&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AppCompatActivity&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;lateinit&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analyticsAdapter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+  &lt;img src=&quot;assets/images/2020-07-21-scoping-in-android_2.png&quot; /&gt;
+  &lt;small&gt;You get the same instance of `AnalyticsAdapter` after a configuration change using ViewModel or Hilt’s `ActivityRetainedScope` annotation&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;p&gt;If you still want to keep the ViewModel because it needs to perform some view logic while complying with good DI practices, you can use Hilt to provide the ViewModel dependencies using &lt;code class=&quot;highlighter-rouge&quot;&gt;@ViewModelInject&lt;/code&gt; as specified in the &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-jetpack#viewmodels&quot;&gt;docs&lt;/a&gt;. This time, &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt; doesn’t need to be scoped to &lt;code class=&quot;highlighter-rouge&quot;&gt;ActivityRetainedComponent&lt;/code&gt; because it is now manually scoped to the ViewModel:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleViewModel&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@ViewModelInject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analyticsAdapter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;nd&quot;&gt;@AndroidEntryPoint&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleActivity&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AppCompatActivity&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;viewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ExampleViewModel&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;by&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewModels&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analyticsAdapter&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;viewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;analyticsAdapter&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;What we’ve seen so far can be applied to all Hilt components that are managed by Android framework lifecycle classes; see the &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-android#component-scopes&quot;&gt;full list of scopes available here&lt;/a&gt;. Circling back to our initial example, scoping to the &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt; is the same as having an instance of that type in the application class without using DI principles.&lt;/p&gt;
+
+&lt;h2 id=&quot;scoping-with-hilt-vs-viewmodel&quot;&gt;Scoping with Hilt vs ViewModel&lt;/h2&gt;
+
+&lt;p&gt;The advantage of scoping with Hilt is that scoped types are available in the Hilt component hierarchy whereas with ViewModel, you have to manually access the scoped types from the ViewModel.&lt;/p&gt;
+
+&lt;p&gt;The advantage of scoping with ViewModel is that you can have ViewModels for any &lt;a href=&quot;https://developer.android.com/reference/androidx/lifecycle/LifecycleOwner&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;LifecycleOwner&lt;/code&gt;&lt;/a&gt; objects in your application. For example, if you use the &lt;a href=&quot;https://developer.android.com/guide/navigation/navigation-getting-started&quot;&gt;Jetpack Navigation library&lt;/a&gt;, you can have a ViewModel attached to your &lt;a href=&quot;https://developer.android.com/reference/androidx/navigation/fragment/NavHostFragment&quot;&gt;NavGraph&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Hilt provides a limited number of scopes. You might find that you don’t have a scope for your particular use case — for example, when using nested fragments. For that case, you can fall back to scoping using ViewModel.&lt;/p&gt;
+
+&lt;h2 id=&quot;injecting-viewmodels-with-hilt&quot;&gt;Injecting ViewModels with Hilt&lt;/h2&gt;
+
+&lt;p&gt;As seen above, you can use &lt;code class=&quot;highlighter-rouge&quot;&gt;@ViewModelInject&lt;/code&gt; to inject dependencies into ViewModels. Under the hood, these bindings are kept in the &lt;code class=&quot;highlighter-rouge&quot;&gt;ActivityRetainedComponent&lt;/code&gt;, which is why you can only inject types that are either unscoped, or scoped to &lt;code class=&quot;highlighter-rouge&quot;&gt;ActivityRetainedComponent&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The ViewModel factory generated by Hilt is available in the &lt;code class=&quot;highlighter-rouge&quot;&gt;getDefaultViewModelProviderFactory()&lt;/code&gt; method of &lt;code class=&quot;highlighter-rouge&quot;&gt;@AndroidEntryPoint&lt;/code&gt;-annotated activities and fragments. That gives you more flexibility as you can use it in &lt;code class=&quot;highlighter-rouge&quot;&gt;ViewModelProvider&lt;/code&gt; to obtain other ViewModels, e.g. those scoped to a &lt;code class=&quot;highlighter-rouge&quot;&gt;BackStackEntry&lt;/code&gt;.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Scoping can be costly because the provided object stays in memory until the holder is destroyed. Be thoughtful about the use of scoped objects in your application. It is appropriate to scope objects with an internal state that requires the same instance to be used, objects that need synchronization, or objects that you have measured to be expensive to create.&lt;/p&gt;
+
+&lt;p&gt;However, when you do need to scope, you can use Hilt’s scoping annotations or the Android framework directly.&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="hilt" />
+      
+
+      
+        <summary type="html">Learn about scoping in Android and how that relates to scoping in Hilt</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Android Coroutines - How to manage async tasks in Kotlin</title>
+      <link href="https://manuelvivo.dev/coroutines-in-2020" rel="alternate" type="text/html" title="Android Coroutines - How to manage async tasks in Kotlin" />
+      <published>2020-07-13T00:00:00+00:00</published>
+      <updated>2020-07-13T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/coroutines-in-2020</id>
+      <content type="html" xml:base="https://manuelvivo.dev/coroutines-in-2020">&lt;p&gt;State of coroutines on Android in 2020&lt;/p&gt;
+
+&lt;h2 id=&quot;description&quot;&gt;Description&lt;/h2&gt;
+
+&lt;p&gt;Take a good look at the current state of coroutines support in Android libraries and tools, explore some interesting and not-so-obvious edge cases when dealing with Kotlin code that includes coroutines and interop with Java, and briefly look at some new developments in Kotlin coroutines, namely StateFlow and its comparison with LiveData, and SharedFlow.&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/6manrgTPzyA&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h3 id=&quot;resources&quot;&gt;Resources&lt;/h3&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/coroutines-posts&quot;&gt;Coroutines blog posts&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2R3DS9k&quot;&gt;Coroutines codelab&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2R1ojz6&quot;&gt;Advanced coroutines codelab&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/3bMiUn8&quot;&gt;Testing coroutines talk&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/39wgxU8&quot;&gt;Cancellation and exceptions in coroutines&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/30FDT8S&quot;&gt;Check out the 11 Weeks of Android website&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/AndroidDevs&quot;&gt;Subscribe to Android Developers&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="talks" />
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">State of coroutines on Android in 2020</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Hilt — Adding components to the hierarchy</title>
+      <link href="https://manuelvivo.dev/hilt-adding-components" rel="alternate" type="text/html" title="Hilt — Adding components to the hierarchy" />
+      <published>2020-07-09T00:00:00+00:00</published>
+      <updated>2020-07-09T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/hilt-adding-components</id>
+      <content type="html" xml:base="https://manuelvivo.dev/hilt-adding-components">&lt;p&gt;Get more flexibility in Hilt by adding your own components to the hierarchy&lt;/p&gt;
+
+&lt;p&gt;Inserting a component in the middle of the Hilt component hierarchy is not possible. However, you can create a custom component with a Hilt component as a parent and access its scoped types using entry points. In the article, we’ll see what all this implies and how to add a custom component in the &lt;em&gt;Dagger 2 codelab&lt;/em&gt; code.&lt;/p&gt;
+
+&lt;p&gt;The &lt;a href=&quot;https://codelabs.developers.google.com/codelabs/android-dagger/&quot;&gt;Dagger 2 codelab&lt;/a&gt; goes through adding Dagger to a multiple-Activity application. As the user can log in and out of the app, user information is handled in a Dagger component with a lifespan longer than activity components.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-07-09-hilt-adding-components_1.png&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;Dagger components in the Dagger codelab app&lt;/small&gt;&lt;/p&gt;
+
+&lt;p&gt;In the diagram above, notice how &lt;code class=&quot;highlighter-rouge&quot;&gt;MainActivity&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;SettingsActivity&lt;/code&gt; access the &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt; with &lt;code class=&quot;highlighter-rouge&quot;&gt;UserDataRepository&lt;/code&gt; scoped to it. The in-memory &lt;code class=&quot;highlighter-rouge&quot;&gt;UserDataRepository&lt;/code&gt; handles information related to a logged-in user. When the user logs out, we want to remove the info from memory.&lt;/p&gt;
+
+&lt;p&gt;In Hilt and Dagger, every component must be held by an object (you can think of it as a lifecycle owner) that knows when the component needs to be created or destroyed. In our example, that class is &lt;code class=&quot;highlighter-rouge&quot;&gt;UserManager&lt;/code&gt; that keeps track of logins and logouts. When the user logs in, a new component is created and when the user logs out, the component is destroyed. In that way, &lt;code class=&quot;highlighter-rouge&quot;&gt;MainActivity&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;SettingsActivity&lt;/code&gt; can access the same instance of the component to get injected by it.&lt;/p&gt;
+
+&lt;p&gt;All components of this app &lt;em&gt;except&lt;/em&gt; &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt; can be mapped to Hilt’s standard components: &lt;code class=&quot;highlighter-rouge&quot;&gt;AppComponent&lt;/code&gt; maps to Hilt’s &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt; while &lt;code class=&quot;highlighter-rouge&quot;&gt;RegistrationComponent&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;LoginComponent&lt;/code&gt; map to &lt;code class=&quot;highlighter-rouge&quot;&gt;ActivityComponent&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;What can we do to make &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt; more Hilt-friendly? We have different possibilities:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;Scope &lt;code class=&quot;highlighter-rouge&quot;&gt;UserDataRepository&lt;/code&gt; to the &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt; and handle nullability when the user is logged out. This is what the &lt;a href=&quot;https://codelabs.developers.google.com/codelabs/android-dagger-to-hilt/#0&quot;&gt;Migrating your Dagger app to Hilt codelab&lt;/a&gt; does. Not ideal, but could work in this case. However, it might add some tricky race conditions to deal with on a user switch.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Make &lt;code class=&quot;highlighter-rouge&quot;&gt;MainActivity&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;SettingsActivity&lt;/code&gt; fragments, and have the &lt;code class=&quot;highlighter-rouge&quot;&gt;UserDataRepository&lt;/code&gt; scoped to the activity (Hilt’s &lt;code class=&quot;highlighter-rouge&quot;&gt;ActivityRetainedComponent&lt;/code&gt;) where those fragments are used. This is a “doing stuff to fit the framework rather than the framework fitting the use case” sort of solution. This doesn’t even work for all situations as you might need to access user information in other places that aren’t tied to the activity like a broadcast receiver.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Keep the same navigation structure and add the &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt; to be used by Hilt.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;As an exercise to learn more about the flexibility of Hilt, let’s cover option 3 in this post: adding a component to the Hilt component hierarchy.&lt;/p&gt;
+
+&lt;h2 id=&quot;hilt-design-decisions&quot;&gt;Hilt design decisions&lt;/h2&gt;
+
+&lt;p&gt;Hilt is opinionated on its component hierarchy as it contains the most common set of components an Android app typically uses. Due to compatibility concerns and Hilt not knowing how to create your component (e.g. what &lt;code class=&quot;highlighter-rouge&quot;&gt;userId&lt;/code&gt; to use), it’s not possible to &lt;em&gt;insert&lt;/em&gt; a component between the layers (e.g. making a custom component X subcomponent of &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt;, and parent of &lt;code class=&quot;highlighter-rouge&quot;&gt;ActivityRetainedComponent&lt;/code&gt;).&lt;/p&gt;
+
+&lt;p&gt;What is possible is &lt;em&gt;adding&lt;/em&gt; a component to the hierarchy as a leaf component. In our case, we could make our custom component &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt; to be a subcomponent of &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt; as seen in the image.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-07-09-hilt-adding-components_2.png&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;Adding a subcomponent of ApplicationComponent to the Hilt hierarchy&lt;/small&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;The use case in this article consists of adding a custom component (i.e. &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt;) to the hierarchy that has &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt; as a parent. However, as we’ll see later, you can make your custom component extend any Component you want, either a predefined Hilt component or your own other custom one.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;The main difference between &lt;em&gt;inserting&lt;/em&gt; and &lt;em&gt;adding&lt;/em&gt; a component is that if you insert a component in the hierarchy, its scoped bindings are available in its subcomponents (components below in the hierarchy) whereas if you &lt;em&gt;add&lt;/em&gt; a component, they won’t. You could make those scoped bindings flow down (or being available in) the hierarchy if you create your own hierarchy parallel to Hilt’s one. However, that’d make you lose the &lt;code class=&quot;highlighter-rouge&quot;&gt;@AndroidEntryPoint&lt;/code&gt; functionality and you’d have to use entry points to obtain dependencies in Android framework classes.&lt;/p&gt;
+
+&lt;p&gt;As we’ll be adding a component to the hierarchy in our example, we won’t have &lt;code class=&quot;highlighter-rouge&quot;&gt;UserDataRepository&lt;/code&gt; (&lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt;’s scoped type) available as a binding in &lt;code class=&quot;highlighter-rouge&quot;&gt;@AndroidEntryPoint&lt;/code&gt; classes, so we won’t be able to inject it as any other scoped type:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@Singleton&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsRepository&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;/*...*/) { /* ... */&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MainActivityAnalyticsAdapter&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// AnalyticsRepository is available as it's scoped to ApplicationComponent&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;analyticsRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// 💥 Build time error!&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// UserDataRepository is NOT available to Hilt in MainActivity as the binding&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// is not available in ActivityComponent, it's in UserComponent and it's not&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// propagated down the Hilt components hierarchy&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;userDataRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserDataRepository&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We’ll see later what are the different options to obtain the scoped instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;UserDataRepository&lt;/code&gt; in our classes.&lt;/p&gt;
+
+&lt;h2 id=&quot;adding-a-component-to-the-hierarchy&quot;&gt;Adding a component to the hierarchy&lt;/h2&gt;
+
+&lt;p&gt;As shown in the &lt;a href=&quot;https://dagger.dev/hilt/custom-components&quot;&gt;custom components docs&lt;/a&gt;, you can declare a component using the &lt;code class=&quot;highlighter-rouge&quot;&gt;@DefineComponent&lt;/code&gt; annotation.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Annotation for scoping to UserComponent&lt;/span&gt;
+&lt;span class=&quot;nd&quot;&gt;@Scope&lt;/span&gt;
+&lt;span class=&quot;nd&quot;&gt;@MustBeDocumented&lt;/span&gt;
+&lt;span class=&quot;nd&quot;&gt;@Retention&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;value&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnnotationRetention&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;RUNTIME&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;annotation&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;LoggedUserScope&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// Types scoped to this component must be annotated with @LoggedUserScope&lt;/span&gt;
+&lt;span class=&quot;nd&quot;&gt;@LoggedUserScope&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;// Make UserComponent subcomponent of ApplicationComponent&lt;/span&gt;
+&lt;span class=&quot;nd&quot;&gt;@DefineComponent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;parent&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ApplicationComponent&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;class&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserComponent&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Builder to create instances of UserComponent&lt;/span&gt;
+    &lt;span class=&quot;nd&quot;&gt;@DefineComponent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Builder&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Builder&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;setUser&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nd&quot;&gt;@BindsInstance&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;user&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;User&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;):&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserComponent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Builder&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;build&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserComponent&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We made &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt; a subcomponent of &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt; as specified in the parent parameter of the &lt;code class=&quot;highlighter-rouge&quot;&gt;@DefineComponent&lt;/code&gt; annotation. Additionally, we created the &lt;code class=&quot;highlighter-rouge&quot;&gt;@LoggedUserScope&lt;/code&gt; to be able to scope types to &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt;. Use the builder annotated with &lt;code class=&quot;highlighter-rouge&quot;&gt;@DefineComponent.Builder&lt;/code&gt; to create instances of &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt;, as you’ll see later, this is what &lt;code class=&quot;highlighter-rouge&quot;&gt;UserManager&lt;/code&gt; will be using.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Use &lt;code class=&quot;highlighter-rouge&quot;&gt;@DefineComponent&lt;/code&gt; to define a new custom component you can use in your app. It takes in the parent component as a parameter. The new component will extend the parent component meaning that all parent bindings will be available in the new component. Because of our the specific use case for this blog post, we used Hilt’s &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt;, however, you can make it extend any component you want: it could be a Hilt component or any other custom component you already have defined.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;With this, we can scope types to this component already:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@LoggedUserScope&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserDataRepository&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;/*...*/) {/* ... */&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;managing-the-lifecycle-of-the-component&quot;&gt;Managing the lifecycle of the component&lt;/h2&gt;
+
+&lt;p&gt;A class scoped higher up in the components hierarchy should be responsible for the lifecycle of this component. In our case, this class is &lt;code class=&quot;highlighter-rouge&quot;&gt;UserManager&lt;/code&gt; which is scoped to the &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;As &lt;code class=&quot;highlighter-rouge&quot;&gt;UserManager&lt;/code&gt; needs to know how to create instances of &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt;, it should receive its builder in the constructor. As &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt; is a subcomponent of &lt;code class=&quot;highlighter-rouge&quot;&gt;ApplicationComponent&lt;/code&gt;, the builder is available as a binding in there.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@Singleton&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserManager&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Since UserManager will be in charge of managing the UserComponent's&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// lifecycle, it needs to know how to create instances of it. We use the&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// provider (i.e. factory) Dagger generates for us to create instances of UserComponent.&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;userComponentProvider&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Provider&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;UserComponent&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Builder&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+  &lt;span class=&quot;cm&quot;&gt;/**&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   *  UserComponent is specific to a logged in user. Holds an instance of&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   *  UserComponent. This determines if the user is logged in or not, when the&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   *  user logs in, a new Component will be created.&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   *  When the user logs out, this will be null.&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   */&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;userComponent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserComponent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;?&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;null&lt;/span&gt;
+      &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;set&lt;/span&gt;
+
+  &lt;span class=&quot;o&quot;&gt;..&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;
+
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;userLoggedIn&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;String&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// When the user logs in, we create a new instance of UserComponent&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;user&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;createUser&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;userComponent&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;userComponentProvider&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;().&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;setUser&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;user&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;build&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;logout&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// When the user logs out, we remove the instance of UserComponent from memory&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;userComponent&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;null&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;accessing-the-scoped-bindings&quot;&gt;Accessing the scoped bindings&lt;/h2&gt;
+
+&lt;p&gt;You can access the scoped bindings of &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt; with entry points. For our case, we can create an entry point exposing the &lt;code class=&quot;highlighter-rouge&quot;&gt;UserDataRepository&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@InstallIn&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;UserComponent&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;class&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;nd&quot;&gt;@EntryPoint&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserComponentEntryPoint&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;userDataRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserDataRepository&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;You can access this entry point by using an instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;UserComponent&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@AndroidEntryPoint&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MainActivity&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AppCompatActivity&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// Injected by ActivityComponent&lt;/span&gt;
+  &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;lateinit&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;userManager&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserManager&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// Populated by UserComponent&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;lateinit&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;userDataRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserDataRepository&lt;/span&gt;
+
+  &lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;onCreate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;savedInstanceState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Bundle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;?)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;super&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;onCreate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;savedInstanceState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+    &lt;span class=&quot;n&quot;&gt;userDataRepository&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;EntryPoints&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;userManager&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userComponent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserComponentEntryPoint&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;class&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;java&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;userDataRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Do something with userDataRepository&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;caveats&quot;&gt;Caveats&lt;/h2&gt;
+
+&lt;p&gt;There are some caveats to the code we’ve seen so far:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;Scoped types in custom components don’t flow down the Hilt components hierarchy. That’s why you need to use entry points and you cannot have it as a dependency of another class unless you use &lt;a href=&quot;https://github.com/square/AssistedInject&quot;&gt;AssistedInject&lt;/a&gt; as shown in this &lt;a href=&quot;https://github.com/manuelvicnt/android-dagger-to-hilt/pull/1&quot;&gt;example&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;This is not a full login/user solution as this setup works when the user explicitly logs in and out of the app. If your app allows switching accounts while on the same screen, then you’d need to manually restart the activity/fragment when that happens. Alternatively, you could add a callback to &lt;code class=&quot;highlighter-rouge&quot;&gt;UserManager&lt;/code&gt; to know when an account has changed to update the information on the screen accordingly.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Even though inserting a component in the middle of the Hilt component hierarchy is not possible, you can create a component with a Hilt component as a parent and access its scoped types using entry points.&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="hilt" />
+      
+
+      
+        <summary type="html">Get more flexibility in Hilt by adding your own components to the hierarchy</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Dagger and Hilt navigation support in Android Studio</title>
+      <link href="https://manuelvivo.dev/dagger-hilt-navigation-android-studio" rel="alternate" type="text/html" title="Dagger and Hilt navigation support in Android Studio" />
+      <published>2020-07-01T00:00:00+00:00</published>
+      <updated>2020-07-01T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/dagger-hilt-navigation-android-studio</id>
+      <content type="html" xml:base="https://manuelvivo.dev/dagger-hilt-navigation-android-studio">&lt;p&gt;Easily navigate between Dagger and Hilt related code in Android Studio&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Last update: July 23rd, 2020&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Have you ever got lost in a project trying to figure out from where a Dagger or Hilt dependency is being provided? Does it come from an &lt;code class=&quot;highlighter-rouge&quot;&gt;@Inject&lt;/code&gt; constructor? Or maybe from an &lt;code class=&quot;highlighter-rouge&quot;&gt;@Binds&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;@Provides&lt;/code&gt; method? Does it have a qualifier? It’s not an easy task…&lt;/p&gt;
+
+&lt;p&gt;🤔 What if you could know that and more with just one click? 🎯 Ask no more!&lt;/p&gt;
+
+&lt;p&gt;Android Studio 4.1 comes with &lt;strong&gt;new gutter icons that allows you to easily navigate between Dagger-related code&lt;/strong&gt;: dependency producers and consumers, components, subcomponents, and modules! Also, you can find the same information in &lt;strong&gt;&lt;em&gt;Find usages&lt;/em&gt;&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Hilt support&lt;/strong&gt; was added to Android Studio 4.2. Apart from the Dagger features listed above, you can also benefit from easy navigation for &lt;strong&gt;entry points&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-04-23-dagger-hilt-navigation-android-studio_1.gif&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;Easy Dagger and Hilt dependency graph navigation in Android Studio&lt;/small&gt;&lt;/p&gt;
+
+&lt;p&gt;As you can see, navigating the Dagger graph of your Android app has never been easier! Knowing from &lt;em&gt;exactly&lt;/em&gt; which provider method a dependency is coming is just &lt;strong&gt;one click away&lt;/strong&gt; with the new support in Android Studio.&lt;/p&gt;
+
+&lt;h2 id=&quot;in-action&quot;&gt;In action&lt;/h2&gt;
+
+&lt;p&gt;Starting with Android Studio 4.1 Canary 7, you can see a new gutter icon in projects that use Dagger or Hilt:&lt;/p&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+	&lt;img height=&quot;75&quot; src=&quot;assets/images/2020-04-23-dagger-hilt-navigation-android-studio_2.png&quot; /&gt;
+	&lt;small&gt;New Dagger and Hilt gutter icons in Android Studio&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;p&gt;The behavior of these actions are as follows:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;Icon with arrow up -&amp;gt; where the type is provided (i.e. where dependencies come from).&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Tree-shaped icon -&amp;gt; where the type is used as a dependency.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Let’s see some examples of the new functionality using the Dagger branch (&lt;a href=&quot;https://github.com/android/architecture-samples/tree/dev-dagger&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;dev-dagger&lt;/code&gt;&lt;/a&gt;) of the &lt;a href=&quot;https://github.com/android/architecture-samples/tree/dev-dagger&quot;&gt;architecture-samples GitHub&lt;/a&gt; sample.&lt;/p&gt;
+
+&lt;h3 id=&quot;knowing-where-dependencies-are-coming-from&quot;&gt;Knowing where dependencies are coming from&lt;/h3&gt;
+
+&lt;p&gt;Given a class that can be injected by Dagger, if you tap in the gutter icon with the arrow up of a dependency, you’ll navigate to the method that tells Dagger how to provide that type.&lt;/p&gt;
+
+&lt;p&gt;In the following example, &lt;code class=&quot;highlighter-rouge&quot;&gt;TasksViewModel&lt;/code&gt; has a dependency on &lt;code class=&quot;highlighter-rouge&quot;&gt;TasksRepository&lt;/code&gt;. Tapping on the gutter icon takes you to the &lt;code class=&quot;highlighter-rouge&quot;&gt;@Binds&lt;/code&gt; methods in &lt;code class=&quot;highlighter-rouge&quot;&gt;AppModuleBinds&lt;/code&gt; that provides &lt;code class=&quot;highlighter-rouge&quot;&gt;TasksRepository&lt;/code&gt;:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-04-23-dagger-hilt-navigation-android-studio_3.gif&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;Know where a dependency is coming from&lt;/small&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;also-works-with-qualifiers&quot;&gt;Also works with qualifiers!&lt;/h3&gt;
+
+&lt;p&gt;Given the above, if the dependency is provided using a qualifier, it will take you to exactly that provider method!&lt;/p&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;DefaultTasksRepository&lt;/code&gt; depends on a &lt;code class=&quot;highlighter-rouge&quot;&gt;TasksDataSource&lt;/code&gt; provided with a qualifier. Tapping on the gutter icon takes you to the method in &lt;code class=&quot;highlighter-rouge&quot;&gt;AppModule&lt;/code&gt; that provides that type with that qualifier:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-04-23-dagger-hilt-navigation-android-studio_4.gif&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;It also works with qualifiers!&lt;/small&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;where-is-this-type-being-used-as-a-dependency&quot;&gt;Where is this type being used as a dependency?&lt;/h3&gt;
+
+&lt;p&gt;When you have a method that tells Dagger how to provide a dependency, you can click the gutter icon with the arrow down to navigate to where that dependency is used. If that dependency is used by more than one consumer, you can select the consumer you want to navigate to from a list.&lt;/p&gt;
+
+&lt;p&gt;In our project, &lt;code class=&quot;highlighter-rouge&quot;&gt;DefaultTasksRepository&lt;/code&gt; is used by different ViewModels. Which ones? You can know it by tapping on the gutter icon of the provider method (&lt;code class=&quot;highlighter-rouge&quot;&gt;@Binds&lt;/code&gt; in this case):&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-04-23-dagger-hilt-navigation-android-studio_5.gif&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;Know where a type is used as a dependency&lt;/small&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;hilt-entry-points&quot;&gt;Hilt entry points&lt;/h3&gt;
+
+&lt;p&gt;When you’re at a &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-android#not-supported&quot;&gt;Hilt entry point&lt;/a&gt;, the gutter action helps you navigate to where a dependency is coming from. To showcase this feature, we’ll use the &lt;a href=&quot;https://github.com/googlecodelabs/android-dagger-to-hilt/tree/interop&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;interop&lt;/code&gt;&lt;/a&gt; branch of the &lt;a href=&quot;https://codelabs.developers.google.com/codelabs/android-dagger-to-hilt/&quot;&gt;migrating Dagger to Hilt codelab&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-04-23-dagger-hilt-navigation-android-studio_6.gif&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;Navigate where a type comes from at an entry point&lt;/small&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;find-usages&quot;&gt;Find usages&lt;/h2&gt;
+
+&lt;p&gt;You can find the same relationships between your Dagger/Hilt code with the &lt;em&gt;Find usages&lt;/em&gt; feature in Android Studio.&lt;/p&gt;
+
+&lt;p&gt;If you right-click on the &lt;code class=&quot;highlighter-rouge&quot;&gt;bindRepository&lt;/code&gt; of the &lt;code class=&quot;highlighter-rouge&quot;&gt;AppModuleBinds&lt;/code&gt; class and select &lt;strong&gt;&lt;em&gt;Find usages&lt;/em&gt;&lt;/strong&gt;, for example, you’ll see something similar to this:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-04-23-dagger-hilt-navigation-android-studio_7.png&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;Find usages about bindRepository&lt;/small&gt;&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;What are you waiting for to give it a try? Please, use it in your projects and give us feedback in this &lt;a href=&quot;https://issuetracker.google.com/issues/new?component=192708&amp;amp;template=840533&amp;amp;title=%5BPlease+title+your+report%5D+%23dagger-support&quot;&gt;link&lt;/a&gt;. Hope you enjoy it!&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="hilt" />
+      
+        <category term="dagger" />
+      
+
+      
+        <summary type="html">Easily navigate between Dagger and Hilt related code in Android Studio</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Dependency injection on Android with Hilt</title>
+      <link href="https://manuelvivo.dev/di-with-hilt" rel="alternate" type="text/html" title="Dependency injection on Android with Hilt" />
+      <published>2020-06-10T00:00:00+00:00</published>
+      <updated>2020-06-10T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/di-with-hilt</id>
+      <content type="html" xml:base="https://manuelvivo.dev/di-with-hilt">&lt;p&gt;Learn about Jetpack’s recommended library for dependency injection&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://developer.android.com/training/dependency-injection&quot;&gt;Dependency injection&lt;/a&gt; (DI) is a technique widely used in programming and well suited to Android development, where dependencies are provided to a class instead of creating them itself. By following DI principles, you lay the groundwork for good app architecture, greater code reusability, and ease of testing. Have you ever tried manual dependency injection in your app? Even with many of the existing dependency injection libraries today, it requires a lot of boilerplate code as your project becomes larger, since you have to construct every class and its dependencies by hand, and create containers to reuse and manage dependencies.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;By following DI principles, you lay the groundwork for good app architecture, greater code reusability, and ease of testing.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;The new &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-android&quot;&gt;Hilt&lt;/a&gt; library defines a &lt;strong&gt;standard way&lt;/strong&gt; to do DI in your application by providing containers for every Android class in your project and managing their lifecycles &lt;em&gt;automatically&lt;/em&gt; for you. Hilt is currently in &lt;em&gt;alpha&lt;/em&gt;, try it in your app and give us feedback using this &lt;a href=&quot;https://github.com/google/dagger/issues/new&quot;&gt;link&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Hilt is built on top of the popular DI library &lt;a href=&quot;https://developer.android.com/training/dependency-injection/dagger-basics&quot;&gt;Dagger&lt;/a&gt; so benefits from the &lt;strong&gt;compile time correctness, runtime performance, scalability, and &lt;a href=&quot;https://manuelvivo.dev/dagger-hilt-navigation-android-studio&quot;&gt;Android Studio support&lt;/a&gt;&lt;/strong&gt; that Dagger provides. Due to this, Dagger’s seen great adoption on 30% of top 10k apps of the Google Play Store. However, because of the compile time code generation, expect a build time increase.&lt;/p&gt;
+
+&lt;p&gt;Since many Android framework classes are instantiated by the OS itself, there’s an associated boilerplate when using Dagger in Android apps. Unlike Dagger, Hilt is integrated with Jetpack libraries and Android framework classes and removes most of that boilerplate to let you &lt;strong&gt;focus on just the important parts&lt;/strong&gt; of defining and injecting bindings without worrying about managing all of the Dagger setup and wiring. It automatically generates and provides:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;Components for integrating Android framework classes&lt;/strong&gt; with Dagger that you would otherwise need to create by hand.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;Scope annotations&lt;/strong&gt; for the components that Hilt generates automatically.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;Predefined bindings and qualifiers&lt;/strong&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Best of all, &lt;strong&gt;as Dagger and Hilt can coexist together, apps can be migrated on an as-needed basis&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;hilt-in-action&quot;&gt;Hilt in action&lt;/h2&gt;
+
+&lt;p&gt;Just to show you how easy to use Hilt is, let’s perform some quick DI in a typical Android app. Let’s make Hilt inject an &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt; into our &lt;code class=&quot;highlighter-rouge&quot;&gt;MainActivity&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;First, enable Hilt in your app by annotating your application class with the &lt;code class=&quot;highlighter-rouge&quot;&gt;@HiltAndroidApp&lt;/code&gt; to trigger Hilt’s code generation:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@HiltAndroidApp&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MyApplication&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Application&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Second, tell Hilt how to provide instances of &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt; by annotating its constructor with &lt;code class=&quot;highlighter-rouge&quot;&gt;@Inject&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;And third, to inject an instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;AnalyticsAdapter&lt;/code&gt; into &lt;code class=&quot;highlighter-rouge&quot;&gt;MainActivity&lt;/code&gt;, enable Hilt in the activity with the &lt;code class=&quot;highlighter-rouge&quot;&gt;@AndroidEntryPoint&lt;/code&gt; annotation and perform field injection using the &lt;code class=&quot;highlighter-rouge&quot;&gt;@Inject&lt;/code&gt; annotation:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nd&quot;&gt;@AndroidEntryPoint&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MainActivity&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AppCompatActivity&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  
+  &lt;span class=&quot;nd&quot;&gt;@Inject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;lateinit&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analytics&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt;
+  
+  &lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;onCreate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;savedInstanceState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Bundle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;?)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;super&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;onCreate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;savedInstanceState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// analytics instance has been populated by Hilt&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// and it's ready to be used&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;For more information, you can easily check out what the new annotations do in the cheat sheet section below.&lt;/p&gt;
+
+&lt;h2 id=&quot;comes-with-jetpack-support&quot;&gt;Comes with Jetpack support!&lt;/h2&gt;
+
+&lt;p&gt;You can use your favourite Jetpack libraries with Hilt out of the box. We’re providing direct injection &lt;strong&gt;support for ViewModel and WorkManager&lt;/strong&gt; in this release.&lt;/p&gt;
+
+&lt;p&gt;For example, to inject a &lt;a href=&quot;https://developer.android.com/topic/libraries/architecture/viewmodel&quot;&gt;Architecture Components ViewModel&lt;/a&gt; &lt;code class=&quot;highlighter-rouge&quot;&gt;LoginViewModel&lt;/code&gt; into a &lt;code class=&quot;highlighter-rouge&quot;&gt;LoginActivity&lt;/code&gt;: annotate &lt;code class=&quot;highlighter-rouge&quot;&gt;LoginViewModel&lt;/code&gt; with &lt;code class=&quot;highlighter-rouge&quot;&gt;@ViewModelInject&lt;/code&gt; and use it in the activity or fragment as you’d expect:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;LoginViewModel&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@ViewModelInject&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;constructor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;analyticsAdapter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnalyticsAdapter&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;):&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;..&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;nd&quot;&gt;@AndroidEntryPoint&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;LoginActivity&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AppCompatActivity&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;loginViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;LoginViewModel&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;by&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewModels&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  
+  &lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;onCreate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;savedInstanceState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Bundle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;?)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;super&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;onCreate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;savedInstanceState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// loginViewModel is ready to be used&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Learn more about Jetpack support in the &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-jetpack&quot;&gt;docs&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;start-using-hilt&quot;&gt;Start using Hilt&lt;/h2&gt;
+
+&lt;p&gt;If you’re intrigued by Hilt and want to learn more about it, here’s some resources for you to learn in the way you prefer:&lt;/p&gt;
+
+&lt;h3 id=&quot;getting-started-with-hilt&quot;&gt;Getting started with Hilt&lt;/h3&gt;
+
+&lt;p&gt;Learn how to add Hilt in your Android app with this &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-android#setup&quot;&gt;guide&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h3 id=&quot;documentation&quot;&gt;Documentation&lt;/h3&gt;
+
+&lt;p&gt;If you’re new to DI or Dagger, check out our &lt;a href=&quot;https://developer.android.com/training/dependency-injection/hilt-android&quot;&gt;guide to add Hilt to an Android app&lt;/a&gt;. Alternatively, if you already know Dagger, we’re also providing &lt;a href=&quot;https://dagger.dev/hilt&quot;&gt;documentation on dagger.dev&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;If you’re just curious about the new annotations and what you can do with Hilt, check out this cheat sheet in the section below.&lt;/p&gt;
+
+&lt;h3 id=&quot;for-dagger-users&quot;&gt;For Dagger users&lt;/h3&gt;
+
+&lt;p&gt;If you’re already using Dagger or dagger.android in your app, check out this &lt;a href=&quot;https://dagger.dev/hilt/migration-guide&quot;&gt;migration guide&lt;/a&gt; or the codelab mentioned below to help you switch to Hilt. As Dagger and Hilt can coexist together, you can migrate your app incrementally.&lt;/p&gt;
+
+&lt;h3 id=&quot;codelabs&quot;&gt;Codelabs&lt;/h3&gt;
+
+&lt;p&gt;To learn Hilt in a step-by-step approach, we just released two codelabs:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;a href=&quot;https://codelabs.developers.google.com/codelabs/android-hilt&quot;&gt;Using Hilt in your Android app&lt;/a&gt;&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;a href=&quot;https://codelabs.developers.google.com/codelabs/android-dagger-to-hilt&quot;&gt;Migrate from Dagger to Hilt&lt;/a&gt;&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h3 id=&quot;sample-code&quot;&gt;Sample code&lt;/h3&gt;
+
+&lt;p&gt;Do you want to see how Hilt is used in existing apps? Go check its usage in the &lt;a href=&quot;https://github.com/google/iosched&quot;&gt;Google I/O 2020 app&lt;/a&gt; and in the &lt;a href=&quot;https://github.com/android/architecture-samples/tree/dev-hilt&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;dev-hilt&lt;/code&gt;&lt;/a&gt; branch of the Android &lt;a href=&quot;https://github.com/android/architecture-samples/tree/dev-hilt&quot;&gt;architecture-samples Github repository&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;feedback&quot;&gt;Feedback&lt;/h2&gt;
+
+&lt;p&gt;Hilt is currently in &lt;em&gt;alpha&lt;/em&gt;, try it in your app and give us feedback using this &lt;a href=&quot;https://github.com/google/dagger/issues/new&quot;&gt;link&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;cheat-sheet&quot;&gt;Cheat sheet&lt;/h2&gt;
+
+&lt;p&gt;This cheat sheet allows you to quickly see &lt;strong&gt;&lt;em&gt;what&lt;/em&gt;&lt;/strong&gt; the different Hilt and Dagger annotations do and &lt;strong&gt;&lt;em&gt;how&lt;/em&gt;&lt;/strong&gt; to use them.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://developer.android.com/images/training/dependency-injection/hilt-annotations.pdf&quot;&gt;&lt;strong&gt;Download cheat sheet in PDF&lt;/strong&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-06-10-di-with-hilt.png&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;Hilt and Dagger annotations cheat sheet. &lt;a href=&quot;(https://developer.android.com/images/training/dependency-injection/hilt-annotations.pdf)&quot;&gt;Download in PDF here&lt;/a&gt;.&lt;/small&gt;&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="hilt" />
+      
+
+      
+        <summary type="html">Learn about Jetpack’s recommended library for dependency injection</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Coroutines &amp;amp; Patterns for work that shouldn’t be cancelled</title>
+      <link href="https://manuelvivo.dev/coroutines-cancellation-exceptions-4" rel="alternate" type="text/html" title="Coroutines &amp; Patterns for work that shouldn’t be cancelled" />
+      <published>2020-04-07T00:00:00+00:00</published>
+      <updated>2020-04-07T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/coroutines-cancellation-exceptions-4</id>
+      <content type="html" xml:base="https://manuelvivo.dev/coroutines-cancellation-exceptions-4">&lt;p&gt;Best practices for work that needs to run beyond its current scope with an applicationScope!&lt;/p&gt;
+
+&lt;p&gt;In &lt;a href=&quot;https://medium.com/androiddevelopers/cancellation-in-coroutines-aa6b90163629&quot;&gt;part 2 of the Cancellation and Exceptions in Coroutines series&lt;/a&gt;, we learnt the importance of cancelling work when it’s no longer needed. On Android, you can use the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScopes&lt;/code&gt; provided by Jetpack: &lt;code class=&quot;highlighter-rouge&quot;&gt;viewModelScope&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;lifecycleScope&lt;/code&gt; that cancel any running work when their scope completes — that is when the &lt;code class=&quot;highlighter-rouge&quot;&gt;Activity/Fragment/Lifecycle&lt;/code&gt; completes. If you’re creating your own &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt;, make sure you tie it to a &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; and call cancel when needed.&lt;/p&gt;
+
+&lt;p&gt;However, there are cases when you want an operation to complete even if the user navigated away from a screen. As such, you &lt;em&gt;don’t&lt;/em&gt; want the work to be cancelled (e.g. writing to a database or making a certain network request to your server).&lt;/p&gt;
+
+&lt;p&gt;Keep reading for a pattern to achieve this!&lt;/p&gt;
+
+&lt;h2 id=&quot;coroutines-or-workmanager&quot;&gt;Coroutines or WorkManager?&lt;/h2&gt;
+
+&lt;p&gt;Coroutines will run as long as your application process is alive. If you need to run operations that should outlive the process (e.g. sending logs to your remote server), use &lt;a href=&quot;https://developer.android.com/topic/libraries/architecture/workmanager&quot;&gt;WorkManager&lt;/a&gt; instead on Android. WorkManager is the library to use for critical operations that are expected to execute at some point in the future.&lt;/p&gt;
+
+&lt;p&gt;Use coroutines for operations that are valid in the current process and can be cancelled if the user kills the app (e.g. making a network request you want to cache). What’s the pattern to trigger these operations?&lt;/p&gt;
+
+&lt;h2 id=&quot;coroutines-best-practices&quot;&gt;Coroutines best practices&lt;/h2&gt;
+
+&lt;p&gt;Since this pattern builds upon other coroutine best practices; let’s recap them:&lt;/p&gt;
+
+&lt;h3 id=&quot;1-inject-dispatchers-into-classes&quot;&gt;1. Inject Dispatchers into classes&lt;/h3&gt;
+
+&lt;p&gt;Don’t hardcode them when creating new coroutines or calling &lt;code class=&quot;highlighter-rouge&quot;&gt;withContext&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;✅ Benefits: ease of testing as you can easily replace them for both unit and instrumentation tests.&lt;/p&gt;
+
+&lt;h3 id=&quot;2-the-viewmodelpresenter-layer-should-create-coroutines&quot;&gt;2. The ViewModel/Presenter layer should create coroutines&lt;/h3&gt;
+
+&lt;p&gt;If it’s a UI-only operation, then the UI layer can do it. If you think this is not possible in your project, it’s likely you’re not following best practice #1 (i.e. it’s more difficult to test VMs that don’t inject &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers&lt;/code&gt;; in that case exposing suspend functions makes it doable).&lt;/p&gt;
+
+&lt;p&gt;✅ Benefits: The UI layer should be dumb and not directly trigger any business logic. Instead, defer that responsibility to the ViewModel/Presenter layer. Testing the UI layer requires instrumentation tests in Android which need an emulator to run.&lt;/p&gt;
+
+&lt;h3 id=&quot;3-the-layers-below-the-viewmodelpresenter-layer-should-expose-suspend-functions-and-flows&quot;&gt;3. The layers below the ViewModel/Presenter layer should expose suspend functions and Flows&lt;/h3&gt;
+
+&lt;p&gt;If you need to create coroutines, use &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/coroutine-scope.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;coroutineScope&lt;/code&gt;&lt;/a&gt; or &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/supervisor-scope.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt;&lt;/a&gt;. If you need them to follow a different scope, this is what this article is about! Keep reading!&lt;/p&gt;
+
+&lt;p&gt;✅ Benefits: The caller (generally the ViewModel layer) can control the execution and lifecycle of the work happening in those layers, being able to cancel when needed.&lt;/p&gt;
+
+&lt;h2 id=&quot;operations-that-shouldnt-be-cancelled-in-coroutines&quot;&gt;Operations that shouldn’t be cancelled in Coroutines&lt;/h2&gt;
+
+&lt;p&gt;Imagine we have a ViewModel and a Repository in our app with the following logic:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MyViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;repo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;callRepo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;viewModelScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;repo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// This shouldn’t be cancelled&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We don’t want &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation()&lt;/code&gt; to be controlled by &lt;code class=&quot;highlighter-rouge&quot;&gt;viewModelScope&lt;/code&gt; as it could be cancelled at any point. We want that operation to outlive &lt;code class=&quot;highlighter-rouge&quot;&gt;viewModelScope&lt;/code&gt;. How can we achieve that?&lt;/p&gt;
+
+&lt;p&gt;To do this, &lt;strong&gt;create your own scope in the Application class and call those operations in coroutines started by it&lt;/strong&gt;. That scope should be injected in the classes that need it.&lt;/p&gt;
+
+&lt;p&gt;The benefits of creating your own &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; vs other solutions we’ll see later (like &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;) is that you can configure it as you wish. Do you need a &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-coroutine-exception-handler/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt;&lt;/a&gt;? Do you have your own thread pool you use as a &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatcher&lt;/code&gt;? Place all that common configuration there in its &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt;!&lt;/p&gt;
+
+&lt;p&gt;You can call it &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt; and it must contain a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob()&lt;/code&gt; so that failures in coroutines don’t propagate in the hierarchy (as seen in &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-3&quot;&gt;part 3 of the series&lt;/a&gt;):&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MyApplication&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Application&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// No need to cancel this scope as it'll be torn down with the process&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;applicationScope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;SupervisorJob&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;otherConfig&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We don’t need to cancel this scope since we want it to remain active as long as the application process is alive, so we don’t hold a reference to the &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt;. We can use this scope to run coroutines that need a longer lifetime than the calling scope might offer in our app.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;For operations that shouldn’t be cancelled, call them from a coroutine created by an application CoroutineScope&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;&lt;strong&gt;Whenever you create a new Repository instance, pass in the applicationScope we created above&lt;/strong&gt;. For tests, check out the &lt;em&gt;Testing&lt;/em&gt; section below.&lt;/p&gt;
+
+&lt;h3 id=&quot;which-coroutine-builder-to-use&quot;&gt;Which coroutine builder to use?&lt;/h3&gt;
+
+&lt;p&gt;Depending on &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation&lt;/code&gt;’s behavior, you’d need to start a new coroutine using either launch or async:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;If it needs to return a result, use &lt;strong&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt;&lt;/strong&gt; and call &lt;strong&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;await&lt;/code&gt;&lt;/strong&gt; to wait for it to finish.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;If not, use &lt;strong&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt;&lt;/strong&gt; and wait for it to finish with &lt;strong&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;join&lt;/code&gt;&lt;/strong&gt;. Note that as explained in &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-3&quot;&gt;part 3 of the series&lt;/a&gt;, you have to handle exceptions manually inside the launch block.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;This is how you’d trigger the coroutine using &lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// if this can throw an exception, wrap inside try/catch&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// or rely on a CoroutineExceptionHandler installed&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// in the externalScope's CoroutineScope&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;join&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;or using &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Any&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// Use a specific type in Result&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;async&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// Exceptions are exposed when calling await, they will be&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// propagated in the coroutine that called doWork. Watch&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// out! They will be ignored if the calling context cancels.&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;await&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In any case, the ViewModel code doesn’t change and with the above, even if the &lt;code class=&quot;highlighter-rouge&quot;&gt;viewModelScope&lt;/code&gt; gets destroyed, the work using &lt;code class=&quot;highlighter-rouge&quot;&gt;externalScope&lt;/code&gt; will keep running. Furthermore, &lt;code class=&quot;highlighter-rouge&quot;&gt;doWork()&lt;/code&gt; won’t return until &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation()&lt;/code&gt; completes as with any other suspend call.&lt;/p&gt;
+
+&lt;h3 id=&quot;what-about-something-simpler&quot;&gt;What about something simpler?&lt;/h3&gt;
+
+&lt;p&gt;Another pattern that could serve some use cases (and it’s probably the first solution anyone would come up with) is wrapping &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation&lt;/code&gt; in the &lt;code class=&quot;highlighter-rouge&quot;&gt;externalScope&lt;/code&gt;’s context using &lt;code class=&quot;highlighter-rouge&quot;&gt;withContext&lt;/code&gt; as follows:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;coroutineContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;However, this approach has some caveats that you should be aware of:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;If the coroutine that calls &lt;code class=&quot;highlighter-rouge&quot;&gt;doWork&lt;/code&gt; is cancelled while &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation&lt;/code&gt; is getting executed, the coroutine will keep executing until the next cancellation point, not after &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation&lt;/code&gt; finishes executing.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt;s don’t work as you’d expect when the context is used in &lt;code class=&quot;highlighter-rouge&quot;&gt;withContext&lt;/code&gt; since the exception will be re-thrown.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&quot;testing&quot;&gt;Testing&lt;/h2&gt;
+
+&lt;p&gt;As we’ll need to inject both &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt;s, what should you inject in those cases?&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-04-07-coroutines-cancellation-exceptions-4.png&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;What to inject in testing&lt;/small&gt;&lt;/p&gt;
+
+&lt;p&gt;🔖 Legend: &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-test/kotlinx.coroutines.test/-test-coroutine-dispatcher/index.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;TestCoroutineDispatcher&lt;/code&gt;&lt;/a&gt;, &lt;a href=&quot;https://github.com/android/plaid/blob/master/test_shared/src/main/java/io/plaidapp/test/shared/MainCoroutineRule.kt&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;MainCoroutineRule&lt;/code&gt;&lt;/a&gt;, &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-test/kotlinx.coroutines.test/-test-coroutine-scope/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;TestCoroutineScope&lt;/code&gt;&lt;/a&gt;, &lt;a href=&quot;https://github.com/google/iosched/blob/adssched/mobile/src/androidTest/java/com/google/samples/apps/iosched/tests/di/TestCoroutinesModule.kt#L36&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;AsyncTask.THREAD_POOL_EXECUTOR.asCoroutineDispatcher()&lt;/code&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;alternatives&quot;&gt;Alternatives&lt;/h2&gt;
+
+&lt;p&gt;There are other ways to implement this behavior with Coroutines. However, those solutions cannot be applied systematically in all use cases. Let’s see some alternatives and why/when you should/shouldn’t use them.&lt;/p&gt;
+
+&lt;h3 id=&quot;-globalscope&quot;&gt;❌ GlobalScope&lt;/h3&gt;
+
+&lt;p&gt;There are multiple reasons why you shouldn’t use &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-global-scope/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;&lt;/a&gt;:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;Promotes hard-coding values&lt;/strong&gt;. It might be tempting to hardcode &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers&lt;/code&gt; if you use &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt; straight-away. That’s a bad practice!&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;It makes testing very hard&lt;/strong&gt;. As your code is going to be executed in an uncontrolled scope, you won’t be able to manage execution of work started by it.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;You can’t have a common CoroutineContext for all coroutines&lt;/strong&gt; built into the scope as we did with the &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt;. Instead, you’d have to pass a common &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; to all coroutines started by &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;strong&gt;Recommendation: Don’t use it directly.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;-processlifecycleowner-scope-in-android&quot;&gt;❌ ProcessLifecycleOwner scope in Android&lt;/h3&gt;
+
+&lt;p&gt;In Android, there’s an &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt; available in the &lt;code class=&quot;highlighter-rouge&quot;&gt;androidx.lifecycle:lifecycle-process&lt;/code&gt; library, accessed with &lt;code class=&quot;highlighter-rouge&quot;&gt;ProcessLifecycleOwner.get().lifecycleScope&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;In this case, you’d inject a &lt;code class=&quot;highlighter-rouge&quot;&gt;LifecycleOwner&lt;/code&gt; instead of a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; as we did before. In production, you’d pass in &lt;code class=&quot;highlighter-rouge&quot;&gt;ProcessLifecycleOwner.get()&lt;/code&gt; and in unit tests, you can create a fake &lt;code class=&quot;highlighter-rouge&quot;&gt;LifecycleOwner&lt;/code&gt; using &lt;code class=&quot;highlighter-rouge&quot;&gt;LifecycleRegistry&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Notice that the default &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of this scope uses &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers.Main.immediate&lt;/code&gt; which might not be desirable for background work. As with &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;, you’d have to pass a common &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; to all coroutines started by it.&lt;/p&gt;
+
+&lt;p&gt;Because of all the above, this alternative requires more work than just creating a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; in the &lt;code class=&quot;highlighter-rouge&quot;&gt;Application&lt;/code&gt; class. Also, I don’t personally like having classes related to the Android lifecycle in layers below the ViewModel/Presenter as these layers should be platform agnostic.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Recommendation: Don’t use it directly.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;️-disclaimer&quot;&gt;⚠️ Disclaimer&lt;/h3&gt;
+
+&lt;p&gt;If it turns out that the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of your &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt; matches the &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;ProcessLifecycleOwner.get().lifecycleScope&lt;/code&gt; one, you can directly assign them as follows:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MyApplication&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Application&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;applicationScope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;GlobalScope&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;You still get all the &lt;em&gt;benefits&lt;/em&gt; mentioned above and you can easily change it if needed in the future.&lt;/p&gt;
+
+&lt;h3 id=&quot;--using-noncancellable&quot;&gt;❌ ✅ Using NonCancellable&lt;/h3&gt;
+
+&lt;p&gt;As seen in &lt;a href=&quot;https://medium.com/androiddevelopers/cancellation-in-coroutines-aa6b90163629&quot;&gt;part 2 of the series&lt;/a&gt;, you can use &lt;code class=&quot;highlighter-rouge&quot;&gt;withContext(NonCancellable)&lt;/code&gt; to be able to call suspend functions in a cancelled coroutine. We suggested using it to perform cleanup code that can suspend. However, you shouldn’t abuse it.&lt;/p&gt;
+
+&lt;p&gt;Doing this is very risky as you lose control of the execution of the coroutine. It’s true that it produces more concise and easier to read code but the problems this can cause in the future are unpredictable.&lt;/p&gt;
+
+&lt;p&gt;Example of its usage:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;NonCancellable&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;As very tempting as it can be to do, you might not always know what’s behind &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation()&lt;/code&gt;: maybe it’s an external library, maybe the implementation is behind an interface,… What problems can happen?&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;You won’t be able to stop those operations in tests.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;An endless loop that uses delay won’t be able to cancel anymore.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Collecting a Flow within it makes the Flow non-cancellable from the outside.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;…&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;These problems can lead to subtle and very hard to debug bugs.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Recommendation: use it ONLY for suspending cleanup code.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Whenever you need some work to run beyond its current scope, we recommend creating a custom scope in your &lt;code class=&quot;highlighter-rouge&quot;&gt;Application&lt;/code&gt; class and running coroutines within it. Avoid using &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;ProcessLifecycleOwner&lt;/code&gt; scope and &lt;code class=&quot;highlighter-rouge&quot;&gt;NonCancellable&lt;/code&gt; for this type of work.&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Best practices for work that needs to run beyond its current scope with an applicationScope!</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Coroutines 101</title>
+      <link href="https://manuelvivo.dev/coroutines-101-talk" rel="alternate" type="text/html" title="Coroutines 101" />
+      <published>2020-04-02T00:00:00+00:00</published>
+      <updated>2020-04-02T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/coroutines-101-talk</id>
+      <content type="html" xml:base="https://manuelvivo.dev/coroutines-101-talk">&lt;p&gt;Introduction to the basics of coroutines&lt;/p&gt;
+
+&lt;h2 id=&quot;description&quot;&gt;Description&lt;/h2&gt;
+
+&lt;p&gt;Manuel Vivo, Android Engineer from the Developer Relations team at Google, gives an introduction to Kotlin Coroutines. Stay tuned to find out about the problems coroutines are trying to solve, how to use coroutines in Android, how to test them, and much more!&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/ZTDXo0-SKuU&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h3 id=&quot;resources&quot;&gt;Resources&lt;/h3&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2R3DS9k&quot;&gt;Coroutines codelab&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2R1ojz6&quot;&gt;Advanced coroutines codelab&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/3bMiUn8&quot;&gt;Testing coroutines talk&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/39wgxU8&quot;&gt;Cancellation and exceptions in coroutines&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2WmhoEb&quot;&gt;Android Conference Talks playlist&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/AndroidDevs&quot;&gt;Subscribe to Android Developers&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="talks" />
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Introduction to the basics of coroutines</summary>
+      
+
+      
+      
+    </entry>
+  
+</feed>

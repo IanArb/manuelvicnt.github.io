@@ -1,0 +1,1663 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<feed xmlns="http://www.w3.org/2005/Atom" >
+  <generator uri="https://jekyllrb.com/" version="3.8.5">Jekyll</generator>
+  <link href="https://manuelvivo.dev/tag/coroutines/feed.xml" rel="self" type="application/atom+xml" />
+  <link href="https://manuelvivo.dev/" rel="alternate" type="text/html" />
+  <updated>2020-12-17T13:00:13+00:00</updated>
+  <id>https://manuelvivo.dev/tag/coroutines/feed.xml</id>
+
+  
+  
+  
+
+  
+    <title type="html">Manuel Vivo .dev | </title>
+  
+
+  
+    <subtitle>A place where you can learn about Android development</subtitle>
+  
+
+  
+
+  
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  
+
+  
+  
+
+  
+    <entry>
+      <title type="html">Simplifying APIs with coroutines and Flow</title>
+      <link href="https://manuelvivo.dev/simplifying-apis-coroutines" rel="alternate" type="text/html" title="Simplifying APIs with coroutines and Flow" />
+      <published>2020-12-16T00:00:00+00:00</published>
+      <updated>2020-12-16T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/simplifying-apis-coroutines</id>
+      <content type="html" xml:base="https://manuelvivo.dev/simplifying-apis-coroutines">&lt;p&gt;Learn how to create your own coroutine adapters and see how they work under the hood&lt;/p&gt;
+
+&lt;p&gt;If you’re a library author, you might want to make your Java-based or callback-based libraries easier to consume from Kotlin using coroutines and Flow. Alternatively, if you’re an API consumer, you may be willing to adapt a 3rd party API surface to coroutines to make them more Kotlin friendly.&lt;/p&gt;
+
+&lt;p&gt;This article covers how to simplify APIs using coroutines and Flow as well as how to build your own adapter using &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; APIs. For the most curious ones, those APIs will be dissected and you’ll see how they work under the hood.&lt;/p&gt;
+
+&lt;p&gt;If you prefer to watch a video about this topic, check this one out:&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/OmHePYcHbyQ&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h2 id=&quot;check-existing-coroutine-adapters&quot;&gt;Check existing coroutine adapters&lt;/h2&gt;
+
+&lt;p&gt;Before writing your own wrappers for existing APIs, check if an adapter or &lt;a href=&quot;https://medium.com/androiddevelopers/extend-your-code-readability-with-kotlin-extensions-542bf702aa36&quot;&gt;extension function&lt;/a&gt; is available for your use case. There are existing libraries with coroutine adapters for common types.&lt;/p&gt;
+
+&lt;h3 id=&quot;future-types&quot;&gt;Future types&lt;/h3&gt;
+
+&lt;p&gt;For future types, there are integrations for Java 8’s &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/integration/kotlinx-coroutines-jdk8/src/future/Future.kt&quot;&gt;CompletableFuture&lt;/a&gt;, and Guava’s &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/integration/kotlinx-coroutines-guava/src/ListenableFuture.kt&quot;&gt;ListenableFuture&lt;/a&gt;. This is not an exhaustive list, search online if an adapter for your future type already exists.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Awaits completion of CompletionStage without blocking a thread&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;CompletionStage&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;await&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt; 
+
+&lt;span class=&quot;c1&quot;&gt;// Awaits completion of ListenableFuture without blocking a thread&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;ListenableFuture&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;await&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;With these functions, you can get rid of callbacks and just suspend the coroutine until the future result comes back.&lt;/p&gt;
+
+&lt;h3 id=&quot;reactive-streams&quot;&gt;Reactive Streams&lt;/h3&gt;
+
+&lt;p&gt;For reactive stream libraries, there are integrations for &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/tree/master/reactive/kotlinx-coroutines-rx3&quot;&gt;RxJava&lt;/a&gt;, &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/tree/master/reactive/kotlinx-coroutines-jdk9&quot;&gt;Java 9 APIs&lt;/a&gt;, and &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/tree/master/reactive/kotlinx-coroutines-reactive&quot;&gt;reactive streams&lt;/a&gt; libraries.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Transforms the given reactive Publisher into Flow.&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;err&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Any&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;Publisher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;asFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;These functions convert a reactive stream into Flow.&lt;/p&gt;
+
+&lt;h3 id=&quot;android-specific-apis&quot;&gt;Android specific APIs&lt;/h3&gt;
+
+&lt;p&gt;For Jetpack libraries or Android platform APIs, take a look at the &lt;a href=&quot;https://developer.android.com/kotlin/ktx/extensions-list&quot;&gt;Jetpack KTX libraries list&lt;/a&gt;. Currently, more than 20 libraries have a KTX version, creating sweet idiomatic versions of Java APIs, ranging from SharedPreferences to ViewModels, SQLite and even Play Core.&lt;/p&gt;
+
+&lt;h3 id=&quot;callbacks&quot;&gt;Callbacks&lt;/h3&gt;
+
+&lt;p&gt;Callbacks are a very common solution for asynchronous communication. In fact, we use them for the Java programming language solution in the &lt;a href=&quot;https://developer.android.com/guide/background/threading&quot;&gt;Running tasks in background thread guide&lt;/a&gt;. However, they come with some drawbacks: this design leads to nested callbacks which ends up in incomprehensible code. Also, error handling is more complicated as there isn’t an easy way to propagate them.&lt;/p&gt;
+
+&lt;p&gt;In Kotlin, you can simplify calling callbacks using coroutines, but for that, you’ll need to build your own adapter.&lt;/p&gt;
+
+&lt;h2 id=&quot;build-your-own-adapter&quot;&gt;Build your own adapter&lt;/h2&gt;
+
+&lt;p&gt;If you don’t find an adapter for your use case, it’s usually quite straightforward to write your own. &lt;strong&gt;For one-shot async calls, use the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/suspend-cancellable-coroutine.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt;&lt;/a&gt; API. For streaming data, use the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/callback-flow.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt;&lt;/a&gt; API&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;As an exercise, the following examples will use the &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient.html&quot;&gt;Fused Location Provider&lt;/a&gt; API from Google Play Services to get location data. The API surface is simple but it uses callbacks to perform async operations. With coroutines, we can get rid of those callbacks that can quickly make our code unreadable when the logic gets complicated.&lt;/p&gt;
+
+&lt;p&gt;In case you want to explore other solutions, you can get inspiration from the source code of all the functions linked above.&lt;/p&gt;
+
+&lt;h3 id=&quot;one-shot-async-calls&quot;&gt;One-shot async calls&lt;/h3&gt;
+
+&lt;p&gt;The &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient.html&quot;&gt;Fused Location Provider&lt;/a&gt; API provides the &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient#getLastLocation()&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;getLastLocation&lt;/code&gt;&lt;/a&gt; method to obtain the &lt;a href=&quot;https://developer.android.com/training/location/retrieve-current&quot;&gt;last known location&lt;/a&gt;. The ideal API for coroutines is a suspend function that returns exactly that.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Note that this API returns a &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/tasks/Task&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Task&lt;/code&gt;&lt;/a&gt; and there’s already an &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/integration/kotlinx-coroutines-play-services/src/Tasks.kt&quot;&gt;adapter&lt;/a&gt; available for it. However, for learning purposes, we’ll use it as an example.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;We can have a better API by creating an extension function on &lt;code class=&quot;highlighter-rouge&quot;&gt;FusedLocationProviderClient&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;awaitLastLocation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;As this is a one-shot async operation, we use the &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; function: a low-level building block for creating suspending functions from the coroutines library.&lt;/p&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; executes the block of code passed to it as a parameter, then suspends the coroutine execution while waiting for the signal to continue. The coroutine will resume executing when the &lt;code class=&quot;highlighter-rouge&quot;&gt;resume&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;resumeWithException&lt;/code&gt; method is called in the coroutine’s &lt;a href=&quot;https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.coroutines/-continuation/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Continuation&lt;/code&gt;&lt;/a&gt; object. For more information about continuations, check out the &lt;em&gt;&lt;a href=&quot;https://manuelvivo.dev/suspend-modifier&quot;&gt;suspend modifier under the hood article&lt;/a&gt;&lt;/em&gt;.&lt;/p&gt;
+
+&lt;p&gt;We use the callbacks that can be added to the &lt;code class=&quot;highlighter-rouge&quot;&gt;getLastLocation&lt;/code&gt; method to resume the coroutine appropriately. See the implementation below:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Extension function on FusedLocationProviderClient, returns last known location&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;awaitLastLocation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// Create a new coroutine that can be cancelled&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;suspendCancellableCoroutine&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;continuation&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Add listeners that will resume the execution of this coroutine&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;lastLocation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;addOnSuccessListener&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;location&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+      &lt;span class=&quot;c1&quot;&gt;// Resume coroutine and return location&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;continuation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;resume&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;addOnFailureListener&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;e&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+      &lt;span class=&quot;c1&quot;&gt;// Resume the coroutine by throwing an exception&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;continuation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;resumeWithException&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// End of the suspendCancellableCoroutine block. This suspends the&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// coroutine until one of the callbacks calls the continuation parameter.&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Note: Although you will also find a non-cancellable version of this coroutine builder in the coroutines library (i.e. &lt;a href=&quot;https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.coroutines/suspend-coroutine.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCoroutine&lt;/code&gt;&lt;/a&gt;), it is preferable to always choose &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/suspend-cancellable-coroutine.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt;&lt;/a&gt; to handle cancellation of the coroutine scope, or to propagate cancellation from the underlying API.&lt;/p&gt;
+
+&lt;h4 id=&quot;suspendcancellablecoroutine-under-the-hood&quot;&gt;suspendCancellableCoroutine under the hood&lt;/h4&gt;
+
+&lt;p&gt;Internally, &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/CancellableContinuation.kt#L305&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt;&lt;/a&gt; uses &lt;a href=&quot;https://github.com/JetBrains/kotlin/blob/master/libraries/stdlib/src/kotlin/coroutines/intrinsics/Intrinsics.kt#L41&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCoroutineUninterceptedOrReturn&lt;/code&gt;&lt;/a&gt; to get the &lt;code class=&quot;highlighter-rouge&quot;&gt;Continuation&lt;/code&gt; of the coroutine inside a suspend function. That &lt;code class=&quot;highlighter-rouge&quot;&gt;Continuation&lt;/code&gt; object is intercepted by a &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/CancellableContinuation.kt&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CancellableContinuation&lt;/code&gt;&lt;/a&gt; that will control the lifecycle of that coroutine from that point (its &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/CancellableContinuationImpl.kt&quot;&gt;implementation&lt;/a&gt; has the functionality of a &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; with some restrictions).&lt;/p&gt;
+
+&lt;p&gt;After that, the lambda passed to &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; will be executed and the coroutine will either resume immediately if the lambda returns a result or will be suspended until the &lt;code class=&quot;highlighter-rouge&quot;&gt;CancellableContinuation&lt;/code&gt; is resumed manually from the lambda.&lt;/p&gt;
+
+&lt;p&gt;See my own comments in the following code snippet (following the &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/CancellableContinuation.kt#L305&quot;&gt;original implementation&lt;/a&gt;) to understand what’s happening:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;inline&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;suspendCancellableCoroutine&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;crossinline&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;block&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;CancellableContinuation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Unit&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;):&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// Get the Continuation object of the coroutine that it's running this suspend function&lt;/span&gt;
+  &lt;span class=&quot;nf&quot;&gt;suspendCoroutineUninterceptedOrReturn&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uCont&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Take over the control of the coroutine. The Continuation's been&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// intercepted and it follows the CancellableContinuationImpl lifecycle now&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;cancellable&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CancellableContinuationImpl&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;uCont&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;intercepted&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+ 
+    &lt;span class=&quot;c1&quot;&gt;// Call block of code with the cancellable continuation&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;block&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cancellable&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        
+    &lt;span class=&quot;c1&quot;&gt;// Either suspend the coroutine and wait for the Continuation to be resumed&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// manually in `block` or return a result if `block` has finished executing&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;cancellable&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;getResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To know more about how suspend functions work under the hood, check out the &lt;em&gt;&lt;a href=&quot;https://manuelvivo.dev/suspend-modifier&quot;&gt;suspend modifier under the hood article&lt;/a&gt;&lt;/em&gt;.&lt;/p&gt;
+
+&lt;h3 id=&quot;streaming-data&quot;&gt;Streaming data&lt;/h3&gt;
+
+&lt;p&gt;If instead we wanted to receive periodic location updates (using the &lt;a href=&quot;https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient#requestLocationUpdates(com.google.android.gms.location.LocationRequest,%20com.google.android.gms.location.LocationCallback,%20android.os.Looper)&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;requestLocationUpdates&lt;/code&gt;&lt;/a&gt; function) whenever the user’s device moves in the real world, we’d need to create a stream of data using &lt;a href=&quot;https://kotlinlang.org/docs/reference/coroutines/flow.html&quot;&gt;Flow&lt;/a&gt;. The ideal API would look like this:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;locationFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To convert streaming callback-based APIs to Flow, use the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/callback-flow.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt;&lt;/a&gt; flow builder that creates a new flow. In the &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; lambda, we’re in the context of a coroutine, therefore, suspend functions can be called. Unlike the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/flow.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;flow&lt;/code&gt;&lt;/a&gt; flow builder, &lt;code class=&quot;highlighter-rouge&quot;&gt;channelFlow&lt;/code&gt; allows values to be emitted from a different &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; or outside a coroutine, with the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.channels/-send-channel/offer.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;offer&lt;/code&gt;&lt;/a&gt; method.&lt;/p&gt;
+
+&lt;p&gt;Normally, flow adapters using &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; follow these three generic steps:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;Create the callback that adds elements into the flow using &lt;code class=&quot;highlighter-rouge&quot;&gt;offer&lt;/code&gt;.&lt;/li&gt;
+  &lt;li&gt;Register the callback.&lt;/li&gt;
+  &lt;li&gt;Wait for the consumer to cancel the coroutine and unregister the callback.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Applying this recipe to this use case, we get the following implementation:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Send location updates to the consumer &lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;locationFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;callbackFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// A new Flow is created. This code executes in a coroutine!&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// 1. Create callback and add elements into the flow&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;callback&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;object&lt;/span&gt; &lt;span class=&quot;err&quot;&gt;: &lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;LocationCallback&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;onLocationResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;LocationResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;?)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;?:&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// Ignore null responses&lt;/span&gt;
+      &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;location&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;in&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;locations&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;try&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+          &lt;span class=&quot;nf&quot;&gt;offer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// Send location to the flow&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;catch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;t&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Throwable&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+          &lt;span class=&quot;c1&quot;&gt;// Location couldn't be sent to the flow &lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// 2. Register the callback to get location updates by calling requestLocationUpdates&lt;/span&gt;
+  &lt;span class=&quot;nf&quot;&gt;requestLocationUpdates&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;createLocationRequest&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;callback&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nc&quot;&gt;Looper&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;getMainLooper&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;addOnFailureListener&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;e&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;close&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// in case of error, close the Flow&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+  &lt;span class=&quot;c1&quot;&gt;// 3. Wait for the consumer to cancel the coroutine and unregister&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// the callback. This suspends the coroutine until the Flow is closed.&lt;/span&gt;
+  &lt;span class=&quot;nf&quot;&gt;awaitClose&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Clean up code goes here&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;removeLocationUpdates&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;callback&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h4 id=&quot;callbackflow-under-the-hood&quot;&gt;callbackFlow under the hood&lt;/h4&gt;
+
+&lt;p&gt;Internally, &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; uses a &lt;a href=&quot;https://kotlinlang.org/docs/reference/coroutines/channels.html&quot;&gt;channel&lt;/a&gt;, which is conceptually very similar to a blocking &lt;a href=&quot;https://en.wikipedia.org/wiki/Queue_(abstract_data_type)&quot;&gt;queue&lt;/a&gt;. A channel is configured with a &lt;code class=&quot;highlighter-rouge&quot;&gt;capacity&lt;/code&gt;: the number of elements that can be buffered. The channel created in &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; has the default capacity of 64 elements. When adding a new element to an already full channel, &lt;code class=&quot;highlighter-rouge&quot;&gt;send&lt;/code&gt; will suspend the producer until there’s space for the new element in the channel whereas &lt;code class=&quot;highlighter-rouge&quot;&gt;offer&lt;/code&gt; won’t add the element to the channel and will return &lt;code class=&quot;highlighter-rouge&quot;&gt;false&lt;/code&gt; immediately.&lt;/p&gt;
+
+&lt;h4 id=&quot;awaitclose-under-the-hood&quot;&gt;awaitClose under the hood&lt;/h4&gt;
+
+&lt;p&gt;Interestingly, &lt;code class=&quot;highlighter-rouge&quot;&gt;awaitClose&lt;/code&gt; uses &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; under the hood. See my own comments in the following code snippet (following the &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/channels/Produce.kt#L49&quot;&gt;original implementation&lt;/a&gt;) to understand what’s happening:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;ProducerScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;*&amp;gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;awaitClose&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;block&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Unit&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{})&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;try&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Suspend the coroutine with a cancellable continuation&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;suspendCancellableCoroutine&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Unit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;cont&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+      &lt;span class=&quot;c1&quot;&gt;// Suspend forever and resume the coroutine successfully only &lt;/span&gt;
+      &lt;span class=&quot;c1&quot;&gt;// when the Flow/Channel is closed&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;invokeOnClose&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;cont&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;resume&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Unit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;finally&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Always execute caller's clean up code&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;block&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h4 id=&quot;reusing-the-flow&quot;&gt;Reusing the Flow&lt;/h4&gt;
+
+&lt;p&gt;Flows are cold and lazy unless specified otherwise with intermediate operators such as &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/conflate.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;conflate&lt;/code&gt;&lt;/a&gt;. This means that the builder block will be executed each time a terminal operator is called on the flow. This might not be a huge problem in our case as adding new location listeners is cheap, however, it might make a difference in other implementations.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;FusedLocationProviderClient&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;locationFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;callbackFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;shareIn&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// Make the flow follow the applicationScope&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;applicationScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// Emit the last emitted element to new collectors&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;replay&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// Keep the producer active while there are active subscribers&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;started&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SharingStarted&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;WhileSubscribed&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To learn more about best practices for adding an &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt; to your app, check out this &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-4&quot;&gt;article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Consider creating coroutine adapters to make your APIs or existing APIs concise, readable and Kotlin idiomatic. First check if the adapter is already available and if not, create your own using &lt;code class=&quot;highlighter-rouge&quot;&gt;suspendCancellableCoroutine&lt;/code&gt; for one-shot calls and &lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt; for streaming data.&lt;/p&gt;
+
+&lt;p&gt;To get hands-on this topic, check out the &lt;a href=&quot;https://codelabs.developers.google.com/codelabs/building-kotlin-extensions-library&quot;&gt;&lt;em&gt;Building a Kotlin extensions library&lt;/em&gt; codelab&lt;/a&gt;.&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Learn how to create your own coroutine adapters and see how they work under the hood</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Going with the Flow</title>
+      <link href="https://manuelvivo.dev/going-with-the-flow" rel="alternate" type="text/html" title="Going with the Flow" />
+      <published>2020-11-24T00:00:00+00:00</published>
+      <updated>2020-11-24T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/going-with-the-flow</id>
+      <content type="html" xml:base="https://manuelvivo.dev/going-with-the-flow">&lt;p&gt;Introduction to coroutines Flow&lt;/p&gt;
+
+&lt;h2 id=&quot;description&quot;&gt;Description&lt;/h2&gt;
+
+&lt;p&gt;Suspend functions in Coroutines are meant for one-shot calls that could return a result. But, how can you create a stream of data to return multiple results over time? In this video of Kotlin Vocabulary, Manuel will give us the benefits of Kotlin Flow, and much more!&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/emk9_tVVLcc&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h3 id=&quot;resources&quot;&gt;Resources&lt;/h3&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/35PMGrh&quot;&gt;The ABC of Coroutines episode&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://d.android.com/kotlin/flow&quot;&gt;Flow documentation&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2wHr94N&quot;&gt;Watch more Kotlin Vocabulary&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/AndroidDevs&quot;&gt;Subscribe to Android Developers&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="talks" />
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Introduction to coroutines Flow</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Android Coroutines - How to manage async tasks in Kotlin</title>
+      <link href="https://manuelvivo.dev/coroutines-in-2020" rel="alternate" type="text/html" title="Android Coroutines - How to manage async tasks in Kotlin" />
+      <published>2020-07-13T00:00:00+00:00</published>
+      <updated>2020-07-13T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/coroutines-in-2020</id>
+      <content type="html" xml:base="https://manuelvivo.dev/coroutines-in-2020">&lt;p&gt;State of coroutines on Android in 2020&lt;/p&gt;
+
+&lt;h2 id=&quot;description&quot;&gt;Description&lt;/h2&gt;
+
+&lt;p&gt;Take a good look at the current state of coroutines support in Android libraries and tools, explore some interesting and not-so-obvious edge cases when dealing with Kotlin code that includes coroutines and interop with Java, and briefly look at some new developments in Kotlin coroutines, namely StateFlow and its comparison with LiveData, and SharedFlow.&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/6manrgTPzyA&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h3 id=&quot;resources&quot;&gt;Resources&lt;/h3&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/coroutines-posts&quot;&gt;Coroutines blog posts&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2R3DS9k&quot;&gt;Coroutines codelab&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2R1ojz6&quot;&gt;Advanced coroutines codelab&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/3bMiUn8&quot;&gt;Testing coroutines talk&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/39wgxU8&quot;&gt;Cancellation and exceptions in coroutines&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/30FDT8S&quot;&gt;Check out the 11 Weeks of Android website&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/AndroidDevs&quot;&gt;Subscribe to Android Developers&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="talks" />
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">State of coroutines on Android in 2020</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Coroutines &amp;amp; Patterns for work that shouldn’t be cancelled</title>
+      <link href="https://manuelvivo.dev/coroutines-cancellation-exceptions-4" rel="alternate" type="text/html" title="Coroutines &amp; Patterns for work that shouldn’t be cancelled" />
+      <published>2020-04-07T00:00:00+00:00</published>
+      <updated>2020-04-07T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/coroutines-cancellation-exceptions-4</id>
+      <content type="html" xml:base="https://manuelvivo.dev/coroutines-cancellation-exceptions-4">&lt;p&gt;Best practices for work that needs to run beyond its current scope with an applicationScope!&lt;/p&gt;
+
+&lt;p&gt;In &lt;a href=&quot;https://medium.com/androiddevelopers/cancellation-in-coroutines-aa6b90163629&quot;&gt;part 2 of the Cancellation and Exceptions in Coroutines series&lt;/a&gt;, we learnt the importance of cancelling work when it’s no longer needed. On Android, you can use the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScopes&lt;/code&gt; provided by Jetpack: &lt;code class=&quot;highlighter-rouge&quot;&gt;viewModelScope&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;lifecycleScope&lt;/code&gt; that cancel any running work when their scope completes — that is when the &lt;code class=&quot;highlighter-rouge&quot;&gt;Activity/Fragment/Lifecycle&lt;/code&gt; completes. If you’re creating your own &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt;, make sure you tie it to a &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; and call cancel when needed.&lt;/p&gt;
+
+&lt;p&gt;However, there are cases when you want an operation to complete even if the user navigated away from a screen. As such, you &lt;em&gt;don’t&lt;/em&gt; want the work to be cancelled (e.g. writing to a database or making a certain network request to your server).&lt;/p&gt;
+
+&lt;p&gt;Keep reading for a pattern to achieve this!&lt;/p&gt;
+
+&lt;h2 id=&quot;coroutines-or-workmanager&quot;&gt;Coroutines or WorkManager?&lt;/h2&gt;
+
+&lt;p&gt;Coroutines will run as long as your application process is alive. If you need to run operations that should outlive the process (e.g. sending logs to your remote server), use &lt;a href=&quot;https://developer.android.com/topic/libraries/architecture/workmanager&quot;&gt;WorkManager&lt;/a&gt; instead on Android. WorkManager is the library to use for critical operations that are expected to execute at some point in the future.&lt;/p&gt;
+
+&lt;p&gt;Use coroutines for operations that are valid in the current process and can be cancelled if the user kills the app (e.g. making a network request you want to cache). What’s the pattern to trigger these operations?&lt;/p&gt;
+
+&lt;h2 id=&quot;coroutines-best-practices&quot;&gt;Coroutines best practices&lt;/h2&gt;
+
+&lt;p&gt;Since this pattern builds upon other coroutine best practices; let’s recap them:&lt;/p&gt;
+
+&lt;h3 id=&quot;1-inject-dispatchers-into-classes&quot;&gt;1. Inject Dispatchers into classes&lt;/h3&gt;
+
+&lt;p&gt;Don’t hardcode them when creating new coroutines or calling &lt;code class=&quot;highlighter-rouge&quot;&gt;withContext&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;✅ Benefits: ease of testing as you can easily replace them for both unit and instrumentation tests.&lt;/p&gt;
+
+&lt;h3 id=&quot;2-the-viewmodelpresenter-layer-should-create-coroutines&quot;&gt;2. The ViewModel/Presenter layer should create coroutines&lt;/h3&gt;
+
+&lt;p&gt;If it’s a UI-only operation, then the UI layer can do it. If you think this is not possible in your project, it’s likely you’re not following best practice #1 (i.e. it’s more difficult to test VMs that don’t inject &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers&lt;/code&gt;; in that case exposing suspend functions makes it doable).&lt;/p&gt;
+
+&lt;p&gt;✅ Benefits: The UI layer should be dumb and not directly trigger any business logic. Instead, defer that responsibility to the ViewModel/Presenter layer. Testing the UI layer requires instrumentation tests in Android which need an emulator to run.&lt;/p&gt;
+
+&lt;h3 id=&quot;3-the-layers-below-the-viewmodelpresenter-layer-should-expose-suspend-functions-and-flows&quot;&gt;3. The layers below the ViewModel/Presenter layer should expose suspend functions and Flows&lt;/h3&gt;
+
+&lt;p&gt;If you need to create coroutines, use &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/coroutine-scope.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;coroutineScope&lt;/code&gt;&lt;/a&gt; or &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/supervisor-scope.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt;&lt;/a&gt;. If you need them to follow a different scope, this is what this article is about! Keep reading!&lt;/p&gt;
+
+&lt;p&gt;✅ Benefits: The caller (generally the ViewModel layer) can control the execution and lifecycle of the work happening in those layers, being able to cancel when needed.&lt;/p&gt;
+
+&lt;h2 id=&quot;operations-that-shouldnt-be-cancelled-in-coroutines&quot;&gt;Operations that shouldn’t be cancelled in Coroutines&lt;/h2&gt;
+
+&lt;p&gt;Imagine we have a ViewModel and a Repository in our app with the following logic:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MyViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;repo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;callRepo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;viewModelScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;repo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// This shouldn’t be cancelled&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We don’t want &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation()&lt;/code&gt; to be controlled by &lt;code class=&quot;highlighter-rouge&quot;&gt;viewModelScope&lt;/code&gt; as it could be cancelled at any point. We want that operation to outlive &lt;code class=&quot;highlighter-rouge&quot;&gt;viewModelScope&lt;/code&gt;. How can we achieve that?&lt;/p&gt;
+
+&lt;p&gt;To do this, &lt;strong&gt;create your own scope in the Application class and call those operations in coroutines started by it&lt;/strong&gt;. That scope should be injected in the classes that need it.&lt;/p&gt;
+
+&lt;p&gt;The benefits of creating your own &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; vs other solutions we’ll see later (like &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;) is that you can configure it as you wish. Do you need a &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-coroutine-exception-handler/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt;&lt;/a&gt;? Do you have your own thread pool you use as a &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatcher&lt;/code&gt;? Place all that common configuration there in its &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt;!&lt;/p&gt;
+
+&lt;p&gt;You can call it &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt; and it must contain a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob()&lt;/code&gt; so that failures in coroutines don’t propagate in the hierarchy (as seen in &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-3&quot;&gt;part 3 of the series&lt;/a&gt;):&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MyApplication&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Application&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// No need to cancel this scope as it'll be torn down with the process&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;applicationScope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;SupervisorJob&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;otherConfig&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We don’t need to cancel this scope since we want it to remain active as long as the application process is alive, so we don’t hold a reference to the &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt;. We can use this scope to run coroutines that need a longer lifetime than the calling scope might offer in our app.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;For operations that shouldn’t be cancelled, call them from a coroutine created by an application CoroutineScope&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;&lt;strong&gt;Whenever you create a new Repository instance, pass in the applicationScope we created above&lt;/strong&gt;. For tests, check out the &lt;em&gt;Testing&lt;/em&gt; section below.&lt;/p&gt;
+
+&lt;h3 id=&quot;which-coroutine-builder-to-use&quot;&gt;Which coroutine builder to use?&lt;/h3&gt;
+
+&lt;p&gt;Depending on &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation&lt;/code&gt;’s behavior, you’d need to start a new coroutine using either launch or async:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;If it needs to return a result, use &lt;strong&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt;&lt;/strong&gt; and call &lt;strong&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;await&lt;/code&gt;&lt;/strong&gt; to wait for it to finish.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;If not, use &lt;strong&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt;&lt;/strong&gt; and wait for it to finish with &lt;strong&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;join&lt;/code&gt;&lt;/strong&gt;. Note that as explained in &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-3&quot;&gt;part 3 of the series&lt;/a&gt;, you have to handle exceptions manually inside the launch block.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;This is how you’d trigger the coroutine using &lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// if this can throw an exception, wrap inside try/catch&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// or rely on a CoroutineExceptionHandler installed&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// in the externalScope's CoroutineScope&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;join&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;or using &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Any&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// Use a specific type in Result&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;async&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// Exceptions are exposed when calling await, they will be&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// propagated in the coroutine that called doWork. Watch&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// out! They will be ignored if the calling context cancels.&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;await&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In any case, the ViewModel code doesn’t change and with the above, even if the &lt;code class=&quot;highlighter-rouge&quot;&gt;viewModelScope&lt;/code&gt; gets destroyed, the work using &lt;code class=&quot;highlighter-rouge&quot;&gt;externalScope&lt;/code&gt; will keep running. Furthermore, &lt;code class=&quot;highlighter-rouge&quot;&gt;doWork()&lt;/code&gt; won’t return until &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation()&lt;/code&gt; completes as with any other suspend call.&lt;/p&gt;
+
+&lt;h3 id=&quot;what-about-something-simpler&quot;&gt;What about something simpler?&lt;/h3&gt;
+
+&lt;p&gt;Another pattern that could serve some use cases (and it’s probably the first solution anyone would come up with) is wrapping &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation&lt;/code&gt; in the &lt;code class=&quot;highlighter-rouge&quot;&gt;externalScope&lt;/code&gt;’s context using &lt;code class=&quot;highlighter-rouge&quot;&gt;withContext&lt;/code&gt; as follows:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;externalScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;coroutineContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;However, this approach has some caveats that you should be aware of:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;If the coroutine that calls &lt;code class=&quot;highlighter-rouge&quot;&gt;doWork&lt;/code&gt; is cancelled while &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation&lt;/code&gt; is getting executed, the coroutine will keep executing until the next cancellation point, not after &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation&lt;/code&gt; finishes executing.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt;s don’t work as you’d expect when the context is used in &lt;code class=&quot;highlighter-rouge&quot;&gt;withContext&lt;/code&gt; since the exception will be re-thrown.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&quot;testing&quot;&gt;Testing&lt;/h2&gt;
+
+&lt;p&gt;As we’ll need to inject both &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt;s, what should you inject in those cases?&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2020-04-07-coroutines-cancellation-exceptions-4.png&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;What to inject in testing&lt;/small&gt;&lt;/p&gt;
+
+&lt;p&gt;🔖 Legend: &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-test/kotlinx.coroutines.test/-test-coroutine-dispatcher/index.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;TestCoroutineDispatcher&lt;/code&gt;&lt;/a&gt;, &lt;a href=&quot;https://github.com/android/plaid/blob/master/test_shared/src/main/java/io/plaidapp/test/shared/MainCoroutineRule.kt&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;MainCoroutineRule&lt;/code&gt;&lt;/a&gt;, &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-test/kotlinx.coroutines.test/-test-coroutine-scope/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;TestCoroutineScope&lt;/code&gt;&lt;/a&gt;, &lt;a href=&quot;https://github.com/google/iosched/blob/adssched/mobile/src/androidTest/java/com/google/samples/apps/iosched/tests/di/TestCoroutinesModule.kt#L36&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;AsyncTask.THREAD_POOL_EXECUTOR.asCoroutineDispatcher()&lt;/code&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;alternatives&quot;&gt;Alternatives&lt;/h2&gt;
+
+&lt;p&gt;There are other ways to implement this behavior with Coroutines. However, those solutions cannot be applied systematically in all use cases. Let’s see some alternatives and why/when you should/shouldn’t use them.&lt;/p&gt;
+
+&lt;h3 id=&quot;-globalscope&quot;&gt;❌ GlobalScope&lt;/h3&gt;
+
+&lt;p&gt;There are multiple reasons why you shouldn’t use &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-global-scope/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;&lt;/a&gt;:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;Promotes hard-coding values&lt;/strong&gt;. It might be tempting to hardcode &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers&lt;/code&gt; if you use &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt; straight-away. That’s a bad practice!&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;It makes testing very hard&lt;/strong&gt;. As your code is going to be executed in an uncontrolled scope, you won’t be able to manage execution of work started by it.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;You can’t have a common CoroutineContext for all coroutines&lt;/strong&gt; built into the scope as we did with the &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt;. Instead, you’d have to pass a common &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; to all coroutines started by &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;strong&gt;Recommendation: Don’t use it directly.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;-processlifecycleowner-scope-in-android&quot;&gt;❌ ProcessLifecycleOwner scope in Android&lt;/h3&gt;
+
+&lt;p&gt;In Android, there’s an &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt; available in the &lt;code class=&quot;highlighter-rouge&quot;&gt;androidx.lifecycle:lifecycle-process&lt;/code&gt; library, accessed with &lt;code class=&quot;highlighter-rouge&quot;&gt;ProcessLifecycleOwner.get().lifecycleScope&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;In this case, you’d inject a &lt;code class=&quot;highlighter-rouge&quot;&gt;LifecycleOwner&lt;/code&gt; instead of a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; as we did before. In production, you’d pass in &lt;code class=&quot;highlighter-rouge&quot;&gt;ProcessLifecycleOwner.get()&lt;/code&gt; and in unit tests, you can create a fake &lt;code class=&quot;highlighter-rouge&quot;&gt;LifecycleOwner&lt;/code&gt; using &lt;code class=&quot;highlighter-rouge&quot;&gt;LifecycleRegistry&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Notice that the default &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of this scope uses &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers.Main.immediate&lt;/code&gt; which might not be desirable for background work. As with &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;, you’d have to pass a common &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; to all coroutines started by it.&lt;/p&gt;
+
+&lt;p&gt;Because of all the above, this alternative requires more work than just creating a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; in the &lt;code class=&quot;highlighter-rouge&quot;&gt;Application&lt;/code&gt; class. Also, I don’t personally like having classes related to the Android lifecycle in layers below the ViewModel/Presenter as these layers should be platform agnostic.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Recommendation: Don’t use it directly.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;️-disclaimer&quot;&gt;⚠️ Disclaimer&lt;/h3&gt;
+
+&lt;p&gt;If it turns out that the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of your &lt;code class=&quot;highlighter-rouge&quot;&gt;applicationScope&lt;/code&gt; matches the &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;ProcessLifecycleOwner.get().lifecycleScope&lt;/code&gt; one, you can directly assign them as follows:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;MyApplication&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Application&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;applicationScope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;GlobalScope&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;You still get all the &lt;em&gt;benefits&lt;/em&gt; mentioned above and you can easily change it if needed in the future.&lt;/p&gt;
+
+&lt;h3 id=&quot;--using-noncancellable&quot;&gt;❌ ✅ Using NonCancellable&lt;/h3&gt;
+
+&lt;p&gt;As seen in &lt;a href=&quot;https://medium.com/androiddevelopers/cancellation-in-coroutines-aa6b90163629&quot;&gt;part 2 of the series&lt;/a&gt;, you can use &lt;code class=&quot;highlighter-rouge&quot;&gt;withContext(NonCancellable)&lt;/code&gt; to be able to call suspend functions in a cancelled coroutine. We suggested using it to perform cleanup code that can suspend. However, you shouldn’t abuse it.&lt;/p&gt;
+
+&lt;p&gt;Doing this is very risky as you lose control of the execution of the coroutine. It’s true that it produces more concise and easier to read code but the problems this can cause in the future are unpredictable.&lt;/p&gt;
+
+&lt;p&gt;Example of its usage:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Repository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineDispatcher&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;suspend&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;doWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ioDispatcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;doSomeOtherWork&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;nf&quot;&gt;withContext&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;NonCancellable&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;veryImportantOperation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;As very tempting as it can be to do, you might not always know what’s behind &lt;code class=&quot;highlighter-rouge&quot;&gt;veryImportantOperation()&lt;/code&gt;: maybe it’s an external library, maybe the implementation is behind an interface,… What problems can happen?&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;You won’t be able to stop those operations in tests.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;An endless loop that uses delay won’t be able to cancel anymore.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Collecting a Flow within it makes the Flow non-cancellable from the outside.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;…&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;These problems can lead to subtle and very hard to debug bugs.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Recommendation: use it ONLY for suspending cleanup code.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Whenever you need some work to run beyond its current scope, we recommend creating a custom scope in your &lt;code class=&quot;highlighter-rouge&quot;&gt;Application&lt;/code&gt; class and running coroutines within it. Avoid using &lt;code class=&quot;highlighter-rouge&quot;&gt;GlobalScope&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;ProcessLifecycleOwner&lt;/code&gt; scope and &lt;code class=&quot;highlighter-rouge&quot;&gt;NonCancellable&lt;/code&gt; for this type of work.&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Best practices for work that needs to run beyond its current scope with an applicationScope!</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Coroutines 101</title>
+      <link href="https://manuelvivo.dev/coroutines-101-talk" rel="alternate" type="text/html" title="Coroutines 101" />
+      <published>2020-04-02T00:00:00+00:00</published>
+      <updated>2020-04-02T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/coroutines-101-talk</id>
+      <content type="html" xml:base="https://manuelvivo.dev/coroutines-101-talk">&lt;p&gt;Introduction to the basics of coroutines&lt;/p&gt;
+
+&lt;h2 id=&quot;description&quot;&gt;Description&lt;/h2&gt;
+
+&lt;p&gt;Manuel Vivo, Android Engineer from the Developer Relations team at Google, gives an introduction to Kotlin Coroutines. Stay tuned to find out about the problems coroutines are trying to solve, how to use coroutines in Android, how to test them, and much more!&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/ZTDXo0-SKuU&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h3 id=&quot;resources&quot;&gt;Resources&lt;/h3&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2R3DS9k&quot;&gt;Coroutines codelab&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2R1ojz6&quot;&gt;Advanced coroutines codelab&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/3bMiUn8&quot;&gt;Testing coroutines talk&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/39wgxU8&quot;&gt;Cancellation and exceptions in coroutines&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/2WmhoEb&quot;&gt;Android Conference Talks playlist&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://goo.gle/AndroidDevs&quot;&gt;Subscribe to Android Developers&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="talks" />
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Introduction to the basics of coroutines</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Exceptions in coroutines</title>
+      <link href="https://manuelvivo.dev/coroutines-cancellation-exceptions-3" rel="alternate" type="text/html" title="Exceptions in coroutines" />
+      <published>2020-03-11T00:00:01+00:00</published>
+      <updated>2020-03-11T00:00:01+00:00</updated>
+      <id>https://manuelvivo.dev/coroutines-cancellation-exceptions-3</id>
+      <content type="html" xml:base="https://manuelvivo.dev/coroutines-cancellation-exceptions-3">&lt;p&gt;All you need to know about exceptions in coroutines&lt;/p&gt;
+
+&lt;p&gt;We, developers, usually spend a lot of time polishing the happy path of our app. However, it’s equally important to provide a proper user experience whenever things don’t go as expected. On one hand, seeing an application crash is a bad experience for the user; on the other hand, showing the right message to the user when an action didn’t succeed is indispensable.&lt;/p&gt;
+
+&lt;p&gt;Handling exceptions properly has a huge impact on how users perceive your application. In this article, we’ll explain how exceptions are propagated in coroutines and how you can always be in control, including the different ways to handle them.&lt;/p&gt;
+
+&lt;p&gt;If you prefer video, check out this talk from KotlinConf’19 by &lt;a href=&quot;https://twitter.com/FMuntenescu&quot;&gt;Florina Muntenescu&lt;/a&gt; and I:&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/w0kfnydnFWI&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;⚠️ In order to follow the rest of the article without any problems, reading and understanding &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-1&quot;&gt;Part 1&lt;/a&gt; of the series is required.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h2 id=&quot;a-coroutine-suddenly-failed-what-now-&quot;&gt;A coroutine suddenly failed! What now? 😱&lt;/h2&gt;
+
+&lt;p&gt;When a coroutine fails with an exception, it will propagate said exception up to its parent! Then, the parent will 1) cancel the rest of its children, 2) cancel itself and 3) propagate the exception up to its parent.&lt;/p&gt;
+
+&lt;p&gt;The exception will reach the root of the hierarchy and all the coroutines that the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; started will get cancelled too.&lt;/p&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+  &lt;img src=&quot;assets/images/2020-03-11-coroutines-cancellation-exceptions-3_1.gif&quot; /&gt;
+  &lt;small&gt;An exception in a coroutine will be propagated throughout the coroutines hierarchy&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;p&gt;While propagating an exception can make sense in some cases, there are other cases when that’s undesirable. Imagine a UI-related &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; that processes user interactions. If a child coroutine throws an exception, the UI scope will be cancelled and the whole UI component will become unresponsive as a cancelled scope cannot start more coroutines.&lt;/p&gt;
+
+&lt;p&gt;What if you don’t want that behavior? Alternatively, you can use a different implementation of &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt;, namely &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt;, in the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; that creates these coroutines.&lt;/p&gt;
+
+&lt;h3 id=&quot;supervisorjob-to-the-rescue&quot;&gt;SupervisorJob to the rescue&lt;/h3&gt;
+
+&lt;p&gt;With a &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-supervisor-job.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt;&lt;/a&gt;, the failure of a child doesn’t affect other children. A &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; won’t cancel itself or the rest of its children. Moreover, &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; won’t propagate the exception either, and will let the child coroutine handle it.&lt;/p&gt;
+
+&lt;p&gt;You can create a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; like this &lt;code class=&quot;highlighter-rouge&quot;&gt;val uiScope = CoroutineScope(SupervisorJob())&lt;/code&gt; to not propagate cancellation when a coroutine fails as this image depicts:&lt;/p&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+  &lt;img src=&quot;assets/images/2020-03-11-coroutines-cancellation-exceptions-3_2.png&quot; /&gt;
+  &lt;small&gt;A SupervisorJob won’t cancel itself or the rest of its children&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;p&gt;If the exception is not handled and the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; doesn’t have a &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-coroutine-exception-handler/index.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt;&lt;/a&gt; (as we’ll see later), it will reach the default thread’s &lt;code class=&quot;highlighter-rouge&quot;&gt;ExceptionHandler&lt;/code&gt;. In the JVM, the exception will be logged to console; and in Android, it will make your app crash regardless of the Dispatcher this happens on.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;💥 Uncaught exceptions will always be thrown regardless of the kind of Job you use&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;The same behavior applies to the scope builders &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/coroutine-scope.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;coroutineScope&lt;/code&gt;&lt;/a&gt; and &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/supervisor-scope.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt;&lt;/a&gt;. These will create a sub-scope (with a &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; or a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; accordingly as a parent) with which you can logically group coroutines (e.g. if you want to do parallel computations or you want them to be or not be affected by each other).&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;&lt;em&gt;Warning&lt;/em&gt;&lt;/strong&gt;: A &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; &lt;strong&gt;only&lt;/strong&gt; works as described when it’s part of a scope: either created using &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/supervisor-scope.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt;&lt;/a&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope(SupervisorJob())&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h3 id=&quot;job-or-supervisorjob-&quot;&gt;Job or SupervisorJob? 🤔&lt;/h3&gt;
+
+&lt;p&gt;When should you use a &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; or a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt;? Use a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt; when you don’t want a failure to cancel the parent and siblings.&lt;/p&gt;
+
+&lt;p&gt;Some examples:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Scope handling coroutines for a particular layer of my app&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;scope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;SupervisorJob&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Child 1&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Child 2&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In this case, if &lt;code class=&quot;highlighter-rouge&quot;&gt;child#1&lt;/code&gt; fails, &lt;em&gt;neither&lt;/em&gt; scope nor &lt;code class=&quot;highlighter-rouge&quot;&gt;child#2&lt;/code&gt; will be cancelled.&lt;/p&gt;
+
+&lt;p&gt;Another example:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Scope handling coroutines for a particular layer of my app&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;scope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Job&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;supervisorScope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;c1&quot;&gt;// Child 1&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;c1&quot;&gt;// Child 2&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In this case, as &lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt; creates a sub-scope with a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt;, if &lt;code class=&quot;highlighter-rouge&quot;&gt;child#1&lt;/code&gt; fails, &lt;code class=&quot;highlighter-rouge&quot;&gt;child#2&lt;/code&gt; will not be cancelled. If instead you use a &lt;code class=&quot;highlighter-rouge&quot;&gt;coroutineScope&lt;/code&gt; in the implementation, the failure will get propagated and will end up cancelling scope too.&lt;/p&gt;
+
+&lt;h3 id=&quot;watch-out-quiz-whos-my-parent-&quot;&gt;Watch out quiz! Who’s my parent? 🎯&lt;/h3&gt;
+
+&lt;p&gt;Given the following snippet of code, can you identify what kind of &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; &lt;code class=&quot;highlighter-rouge&quot;&gt;child#1&lt;/code&gt; has as a parent?&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;scope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Job&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;SupervisorJob&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// new coroutine -&amp;gt; can suspend&lt;/span&gt;
+   &lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// Child 1&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// Child 2&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;child#1&lt;/code&gt;’s parentJob is of type Job! Hope you got it right! Even though at first impression, you might’ve thought that it can be a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt;, it is not because a new coroutine always gets assigned a new &lt;code class=&quot;highlighter-rouge&quot;&gt;Job()&lt;/code&gt; which in this case overrides the &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt;. &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; is the parent of the coroutine created with &lt;code class=&quot;highlighter-rouge&quot;&gt;scope.launch&lt;/code&gt;; so literally, &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; does nothing in that code!&lt;/p&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+  &lt;img src=&quot;assets/images/2020-03-11-coroutines-cancellation-exceptions-3_3.png&quot; /&gt;
+  &lt;small&gt;The parent of `child#1` and `child#2` is of type `Job`, not `SupervisorJob`&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;p&gt;Therefore, if either &lt;code class=&quot;highlighter-rouge&quot;&gt;child#1&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;child#2&lt;/code&gt; fails, the failure will reach scope and all work started by that scope will be cancelled.&lt;/p&gt;
+
+&lt;p&gt;Remember that a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; &lt;strong&gt;only&lt;/strong&gt; works as described when it’s part of a scope: either created using &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/supervisor-scope.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt;&lt;/a&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope(SupervisorJob())&lt;/code&gt;. Passing a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; as a parameter of a coroutine builder will not have the desired effect you would’ve thought for cancellation.&lt;/p&gt;
+
+&lt;p&gt;Regarding exceptions, if any child throws an exception, that &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; won’t propagate the exception up in the hierarchy and will let its coroutine handle it.&lt;/p&gt;
+
+&lt;h3 id=&quot;under-the-hood&quot;&gt;Under the hood&lt;/h3&gt;
+
+&lt;p&gt;If you’re curious about how &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; works under the hood, check out the implementation of the functions &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/JobSupport.kt#L645&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;childCancelled&lt;/code&gt;&lt;/a&gt; and &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/JobSupport.kt#L326&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;notifyCancelling&lt;/code&gt;&lt;/a&gt; in the &lt;code class=&quot;highlighter-rouge&quot;&gt;JobSupport.kt&lt;/code&gt; file.&lt;/p&gt;
+
+&lt;p&gt;In the &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; implementation, the &lt;a href=&quot;https://github.com/Kotlin/kotlinx.coroutines/blob/master/kotlinx-coroutines-core/common/src/Supervisor.kt#L64&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;childCancelled&lt;/code&gt;&lt;/a&gt; method just returns &lt;code class=&quot;highlighter-rouge&quot;&gt;false&lt;/code&gt;, meaning that it doesn’t propagate cancellation but it doesn’t handle the exception either.&lt;/p&gt;
+
+&lt;h2 id=&quot;dealing-with-exceptions-&quot;&gt;Dealing with Exceptions 👩‍🚒&lt;/h2&gt;
+
+&lt;p&gt;Coroutines use the regular Kotlin syntax for handling exceptions: &lt;code class=&quot;highlighter-rouge&quot;&gt;try/catch&lt;/code&gt; or built-in helper functions like &lt;a href=&quot;https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/run-catching.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;runCatching&lt;/code&gt;&lt;/a&gt; (which uses &lt;code class=&quot;highlighter-rouge&quot;&gt;try/catch&lt;/code&gt; internally).&lt;/p&gt;
+
+&lt;p&gt;We said before that &lt;strong&gt;uncaught exceptions will always be thrown&lt;/strong&gt;. However, different coroutines builders treat exceptions in different ways.&lt;/p&gt;
+
+&lt;h3 id=&quot;launch&quot;&gt;Launch&lt;/h3&gt;
+
+&lt;p&gt;With launch, &lt;strong&gt;exceptions will be thrown as soon as they happen&lt;/strong&gt;. Therefore, you can wrap the code that can throw exceptions inside a &lt;code class=&quot;highlighter-rouge&quot;&gt;try/catch&lt;/code&gt;, like in this example:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;try&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;codeThatCanThrowExceptions&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;catch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Exception&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// Handle exception&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;With &lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt;, exceptions will be thrown as soon as they happen.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h3 id=&quot;async&quot;&gt;Async&lt;/h3&gt;
+
+&lt;p&gt;When &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt; is used as a root coroutine (coroutines that are a direct child of a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; instance or &lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt;), &lt;strong&gt;exceptions are not thrown automatically, instead, they’re thrown when you call &lt;code class=&quot;highlighter-rouge&quot;&gt;.await()&lt;/code&gt;&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;To handle exceptions thrown in &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt; whenever it’s a root coroutine, you can wrap the &lt;code class=&quot;highlighter-rouge&quot;&gt;.await()&lt;/code&gt; call inside a &lt;code class=&quot;highlighter-rouge&quot;&gt;try/catch&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nf&quot;&gt;supervisorScope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;deferred&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;async&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;codeThatCanThrowExceptions&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    
+    &lt;span class=&quot;k&quot;&gt;try&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;deferred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;await&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;catch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Exception&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// Handle exception thrown in async&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In this case, notice that calling &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt; will &lt;em&gt;never&lt;/em&gt; throw the exception, that’s why it’s not necessary to wrap it as well. &lt;code class=&quot;highlighter-rouge&quot;&gt;await&lt;/code&gt; will throw the exception that happened inside the &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt; coroutine.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;When &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt; is used as a root coroutine, exceptions are thrown when you call &lt;code class=&quot;highlighter-rouge&quot;&gt;.await()&lt;/code&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Also, notice that we’re using a &lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt; to call &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;await&lt;/code&gt;. As we said before, a &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; lets the coroutine handle the exception; as opposed to &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; that will automatically propagate it up in the hierarchy so the &lt;code class=&quot;highlighter-rouge&quot;&gt;catch&lt;/code&gt; block won’t be called:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nf&quot;&gt;coroutineScope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;try&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;deferred&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;async&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;nf&quot;&gt;codeThatCanThrowExceptions&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;deferred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;await&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;catch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Exception&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// Exception thrown in async WILL NOT be caught here &lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// but propagated up to the scope&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Furthermore, exceptions that happen in coroutines created by other coroutines will always be propagated regardless of the coroutine builder. For example:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;scope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Job&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;async&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// If async throws, launch throws without calling .await()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In this case, if &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt; throws an exception, it will get thrown as soon as it happens because the coroutine that is the direct child of the scope is &lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt;. The reason is that &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt; (with a &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; in its &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt;) will automatically propagate the exception up to its parent (&lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt;) that will throw the exception.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;⚠️ Exceptions thrown in a &lt;code class=&quot;highlighter-rouge&quot;&gt;coroutineScope&lt;/code&gt; builder or in coroutines created by other coroutines won’t be caught in a try/catch!&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;In the &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; section, we mention the existence of &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt;. Let’s dive into it!&lt;/p&gt;
+
+&lt;h3 id=&quot;coroutineexceptionhandler&quot;&gt;CoroutineExceptionHandler&lt;/h3&gt;
+
+&lt;p&gt;The &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt; is an optional element of a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; allowing you to &lt;strong&gt;handle uncaught exceptions&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;Here’s how you can define a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt;, whenever an exception is caught, you have information about the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; where the exception happened and the exception itself:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;handler&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineExceptionHandler&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;exception&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;println&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;Caught $exception&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Exceptions will be caught if these requirements are met:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;When&lt;/strong&gt; ⏰: The exception is thrown by a coroutine that &lt;em&gt;automatically&lt;/em&gt; throws exceptions (works with &lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt;, not with &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt;).&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;Where&lt;/strong&gt; 🌍: If it’s in the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; or a root coroutine (direct child of &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; or a &lt;code class=&quot;highlighter-rouge&quot;&gt;supervisorScope&lt;/code&gt;).&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Let’s see some examples using the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt; defined above. In the following example, the exception will be caught by the handler:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;scope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Job&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;handler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;throw&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Exception&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;Failed coroutine&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In this other case in which the handler is installed in a inner coroutine, it &lt;em&gt;won’t&lt;/em&gt; be caught:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;scope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Job&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;handler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;throw&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Exception&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;Failed coroutine&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The exception isn’t caught because the handler is not installed in the right &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt;. The inner launch will propagate the exception up to the parent as soon as it happens, since the parent doesn’t know anything about the handler, the exception will be thrown.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Dealing with exceptions gracefully in your application is important to have a good user experience, even when things don’t go as expected.&lt;/p&gt;
+
+&lt;p&gt;Remember to use &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; when you want to avoid propagating cancellation when an exception happens, and Job otherwise.&lt;/p&gt;
+
+&lt;p&gt;Uncaught exceptions will be propagated, catch them to provide a great UX!&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">All you need to know about exceptions in coroutines</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Coroutines - First things first</title>
+      <link href="https://manuelvivo.dev/coroutines-cancellation-exceptions-1" rel="alternate" type="text/html" title="Coroutines - First things first" />
+      <published>2020-03-11T00:00:00+00:00</published>
+      <updated>2020-03-11T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/coroutines-cancellation-exceptions-1</id>
+      <content type="html" xml:base="https://manuelvivo.dev/coroutines-cancellation-exceptions-1">&lt;p&gt;Learn about the most basics coroutines concepts&lt;/p&gt;
+
+&lt;p&gt;This series of blog posts goes in-depth into cancellation and exceptions in Coroutines. Cancellation is important for avoiding doing more work than needed which can waste memory and battery life; proper exception handling is key to a great user experience. As the foundation for the other 2 parts of the series (&lt;a href=&quot;https://medium.com/androiddevelopers/cancellation-in-coroutines-aa6b90163629&quot;&gt;part 2: cancellation&lt;/a&gt;, &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-3&quot;&gt;part 3: exceptions&lt;/a&gt;), it’s important to define some core coroutine concepts such as &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; so that we all are on the same page.&lt;/p&gt;
+
+&lt;p&gt;If you prefer video, check out this talk from KotlinConf’19 by &lt;a href=&quot;https://twitter.com/FMuntenescu&quot;&gt;Florina Muntenescu&lt;/a&gt; and I:&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/w0kfnydnFWI&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h2 id=&quot;coroutinescope&quot;&gt;CoroutineScope&lt;/h2&gt;
+
+&lt;p&gt;A &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-coroutine-scope/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt;&lt;/a&gt; keeps track of any coroutine you create using &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/launch.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt;&lt;/a&gt; or &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/async.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt;&lt;/a&gt; (these are extension functions on &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt;). The ongoing work (running coroutines) can be canceled by calling &lt;code class=&quot;highlighter-rouge&quot;&gt;scope.cancel()&lt;/code&gt; at any point in time.&lt;/p&gt;
+
+&lt;p&gt;You should create a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; whenever you want to start and control the lifecycle of coroutines in a particular layer of your app. In some platforms like Android, there are KTX libraries that already provide a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; in certain lifecycle classes such as &lt;a href=&quot;https://developer.android.com/reference/kotlin/androidx/lifecycle/package-summary#(androidx.lifecycle.ViewModel).viewModelScope:kotlinx.coroutines.CoroutineScope&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;viewModelScope&lt;/code&gt;&lt;/a&gt; and &lt;a href=&quot;https://developer.android.com/reference/kotlin/androidx/lifecycle/package-summary#lifecyclescope&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;lifecycleScope&lt;/code&gt;&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;When creating a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; it takes a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; as a parameter to its constructor. You can create a new scope &amp;amp; coroutine with the following code:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;// Job and Dispatcher are combined into a CoroutineContext which&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;// will be discussed shortly&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;scope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Job&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Dispatchers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Main&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;job&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// new coroutine&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;job&quot;&gt;Job&lt;/h2&gt;
+
+&lt;p&gt;A &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; is a handle to a coroutine. For every coroutine that you create (by &lt;code class=&quot;highlighter-rouge&quot;&gt;launch&lt;/code&gt; or &lt;code class=&quot;highlighter-rouge&quot;&gt;async&lt;/code&gt;), it returns a &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-job/index.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt;&lt;/a&gt; instance that uniquely identifies the coroutine and manages its lifecycle. As we saw above, you can also pass a &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; to a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; to keep a handle on its lifecycle.&lt;/p&gt;
+
+&lt;h2 id=&quot;coroutinecontext&quot;&gt;CoroutineContext&lt;/h2&gt;
+
+&lt;p&gt;The &lt;a href=&quot;https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.coroutines/-coroutine-context/index.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt;&lt;/a&gt; is a set of elements that define the behavior of a coroutine. It’s made of:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; — controls the lifecycle of the coroutine.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-coroutine-dispatcher/index.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineDispatcher&lt;/code&gt;&lt;/a&gt; — dispatches work to the appropriate thread.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-coroutine-name/index.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineName&lt;/code&gt;&lt;/a&gt; — name of the coroutine, useful for debugging.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-coroutine-exception-handler/index.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineExceptionHandler&lt;/code&gt;&lt;/a&gt; — handles uncaught exceptions, will be covered in Part 3 of the series.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;What’s the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of a new coroutine? We already know that a new instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; will be created, allowing us to control its lifecycle. The rest of the elements will be inherited from the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of its parent (either another coroutine or the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; where it was created).&lt;/p&gt;
+
+&lt;p&gt;Since a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; can create coroutines and you can create more coroutines inside a coroutine, an implicit &lt;strong&gt;&lt;em&gt;task hierarchy&lt;/em&gt;&lt;/strong&gt; is created. In the following code snippet, apart from creating a new coroutine using the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt;, see how you can create more coroutines inside a coroutine:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;scope&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;CoroutineScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Job&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Dispatchers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Main&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;job&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// New coroutine that has CoroutineScope as a parent&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;result&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;async&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// New coroutine that has the coroutine started by &lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// launch as a parent&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;await&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The root of that hierarchy is usually the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt;. We could visualise that hierarchy as follows:&lt;/p&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+  &lt;img src=&quot;assets/images/2020-03-11-coroutines-cancellation-exceptions-1_1.png&quot; /&gt;
+  &lt;small&gt;Coroutines are executed in a task hierarchy. The parent can be either a CoroutineScope or another coroutine&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;h2 id=&quot;job-lifecycle&quot;&gt;Job lifecycle&lt;/h2&gt;
+
+&lt;p&gt;A &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; can go through a set of states: New, Active, Completing, Completed, Cancelling and Cancelled. While we don’t have access to the states themselves, we can access properties of a Job: &lt;code class=&quot;highlighter-rouge&quot;&gt;isActive&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;isCancelled&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;isCompleted&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+  &lt;img src=&quot;assets/images/2020-03-11-coroutines-cancellation-exceptions-1_2.png&quot; /&gt;
+  &lt;small&gt;Job lifecycle&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;p&gt;If the coroutine is in an active state, the failure of the coroutine or calling &lt;code class=&quot;highlighter-rouge&quot;&gt;job.cancel()&lt;/code&gt; will move the job in the Cancelling state (&lt;code class=&quot;highlighter-rouge&quot;&gt;isActive = false&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;isCancelled = true&lt;/code&gt;). Once all children have completed their work the coroutine will go in the Cancelled state and &lt;code class=&quot;highlighter-rouge&quot;&gt;isCompleted = true&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;parent-coroutinecontext-explained&quot;&gt;Parent CoroutineContext explained&lt;/h2&gt;
+
+&lt;p&gt;In the task hierarchy, each coroutine has a parent that can be either a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; or another coroutine. However, the resulting parent &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of a coroutine can be different from the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of the parent since it’s calculated based on this formula:&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;strong&gt;Parent context&lt;/strong&gt; = Defaults + inherited &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; + arguments&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Where:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;Some elements have &lt;strong&gt;default&lt;/strong&gt; values: &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers.Default&lt;/code&gt; is the default of &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineDispatcher&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;“coroutine”&lt;/code&gt; the default of &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineName&lt;/code&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;The &lt;strong&gt;inherited &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt;&lt;/strong&gt; is the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; or coroutine that created it.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;strong&gt;Arguments&lt;/strong&gt; passed in the coroutine builder will take precedence over those elements in the inherited context.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;strong&gt;&lt;em&gt;Note&lt;/em&gt;&lt;/strong&gt;: &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt;s can be combined using the + operator. As the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; is a set of elements, a new &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; will be created with the elements on the right side of the plus overriding those on the left. E.g. (&lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers.Main, “name”) + (Dispatchers.IO) = (Dispatchers.IO, “name”&lt;/code&gt;)&lt;/p&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+  &lt;img src=&quot;assets/images/2020-03-11-coroutines-cancellation-exceptions-1_3.png&quot; /&gt;
+  &lt;small&gt;Every coroutine started by this CoroutineScope will have at least those elements in the CoroutineContext. CoroutineName is gray because it comes from the default values.&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;p&gt;Now that we know what’s the parent &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of a new coroutine, its actual &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; will be:&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;strong&gt;New coroutine context&lt;/strong&gt; = parent context + &lt;code class=&quot;highlighter-rouge&quot;&gt;Job()&lt;/code&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;If with the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; shown in the image above we create a new coroutine like this:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;job&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;scope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Dispatchers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;IO&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// new coroutine&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;What’s the parent &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of that coroutine and its actual &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt;? See the solution in the image below!&lt;/p&gt;
+
+&lt;p align=&quot;center&quot;&gt;
+  &lt;img src=&quot;assets/images/2020-03-11-coroutines-cancellation-exceptions-1_4.png&quot; /&gt;
+  &lt;small&gt;The Job in the CoroutineContext and in the parent context will never be the same instance as a new coroutine always get a new instance of a Job&lt;/small&gt;
+&lt;/p&gt;
+
+&lt;p&gt;The resulting parent &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; has &lt;code class=&quot;highlighter-rouge&quot;&gt;Dispatchers.IO&lt;/code&gt; instead of the scope’s &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineDispatcher&lt;/code&gt; since it was overridden by the argument of the coroutine builder. Also, check that the &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; in the parent &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; is the instance of the scope’s &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; (red color), and a new instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; (green color) has been assigned to the actual &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; of the new coroutine.&lt;/p&gt;
+
+&lt;p&gt;As we will see in Part 3 of the series, a &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; can have a different implementation of &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; called &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; in its &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineContext&lt;/code&gt; that changes how the &lt;code class=&quot;highlighter-rouge&quot;&gt;CoroutineScope&lt;/code&gt; deals with exceptions. Therefore, a new coroutine created with that scope can have &lt;code class=&quot;highlighter-rouge&quot;&gt;SupervisorJob&lt;/code&gt; as a parent &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt;. However, when the parent of a coroutine is another coroutine, the parent &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt; will always be of type &lt;code class=&quot;highlighter-rouge&quot;&gt;Job&lt;/code&gt;.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;Now that you know the basics of coroutines, start learning more about cancellation and exceptions in coroutines with &lt;a href=&quot;https://medium.com/androiddevelopers/cancellation-in-coroutines-aa6b90163629&quot;&gt;part 2&lt;/a&gt; for cancellation, &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-3&quot;&gt;part 3&lt;/a&gt; for exceptions, and &lt;a href=&quot;https://manuelvivo.dev/coroutines-cancellation-exceptions-4&quot;&gt;part 4&lt;/a&gt; for work that shouldn’t be cancelled.&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Learn about the most basics coroutines concepts</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Coroutines! Gotta catch ‘em all! - KotlinConf 2019</title>
+      <link href="https://manuelvivo.dev/coroutines-gotta-catch-em-all" rel="alternate" type="text/html" title="Coroutines! Gotta catch 'em all! - KotlinConf 2019" />
+      <published>2019-12-04T00:00:00+00:00</published>
+      <updated>2019-12-04T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/coroutines-gotta-catch-em-all</id>
+      <content type="html" xml:base="https://manuelvivo.dev/coroutines-gotta-catch-em-all">&lt;p&gt;All about cancellation and exceptions in coroutines&lt;/p&gt;
+
+&lt;h3 id=&quot;abstract&quot;&gt;Abstract&lt;/h3&gt;
+
+&lt;p&gt;You’ve added coroutines to your app and everything is fine while your users are on the happy path. But what happens if you cancel a coroutine, you get a timeout or other type of error? Where do you handle it?&lt;/p&gt;
+
+&lt;p&gt;Kotlin added structured concurrency to scope the lifetime of a coroutine. But what kind of scopes should you use? How do scopes affect error handling? Does the way you start a coroutine, using launch or async have any effect on the type of errors or the way you handle them?&lt;/p&gt;
+
+&lt;p&gt;In this talk we’ll go over all of these use cases and show how they can be implemented to ensure robust error handling and a good user experience, even when you’re thrown off the happy path.&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/w0kfnydnFWI&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h3 id=&quot;presenters&quot;&gt;Presenters&lt;/h3&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://twitter.com/FMuntenescu&quot;&gt;Florina&lt;/a&gt; is working as an Android Developer Advocate at Google, helping developers architect clean, testable apps using the Architecture Components libraries. She has been working with Android for 8 years, previous work covering news at upday, payment solutions at payleven and navigation services at Garmin.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://twitter.com/manuelvicnt&quot;&gt;Manuel&lt;/a&gt; is an Android Developer Relations Engineer at Google. With previous experience at Capital One, he currently focuses on App Architecture, Kotlin &amp;amp; Coroutines, Dependency Injection and Jetpack Compose.&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="talks" />
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">All about cancellation and exceptions in coroutines</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Lessons learnt using Coroutines Flow in the Android Dev Summit 2019 app</title>
+      <link href="https://manuelvivo.dev/lessons-learnt-flow-ads-2019" rel="alternate" type="text/html" title="Lessons learnt using Coroutines Flow in the Android Dev Summit 2019 app" />
+      <published>2019-11-26T00:00:00+00:00</published>
+      <updated>2019-11-26T00:00:00+00:00</updated>
+      <id>https://manuelvivo.dev/lessons-learnt-flow-ads-2019</id>
+      <content type="html" xml:base="https://manuelvivo.dev/lessons-learnt-flow-ads-2019">&lt;p&gt;Best practices we found when using Flow in the ADS 2019 app&lt;/p&gt;
+
+&lt;p&gt;This article is about the best practices we found when using &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-flow/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Flow&lt;/code&gt;&lt;/a&gt; in the &lt;a href=&quot;https://play.google.com/store/apps/details?id=com.google.samples.apps.adssched&quot;&gt;Android Dev Summit (ADS) 2019 app&lt;/a&gt;; which has just been &lt;a href=&quot;https://github.com/google/iosched/tree/adssched&quot;&gt;open sourced&lt;/a&gt;. Keep reading to find out how each layer of our app handles data streams.&lt;/p&gt;
+
+&lt;p&gt;The ADS app architecture follows the &lt;a href=&quot;https://developer.android.com/jetpack/docs/guide#recommended-app-arch&quot;&gt;recommended app architecture guide&lt;/a&gt;, with the addition of a domain layer (of UseCases) which help separate concerns, keeping classes small, focused, reusable and testable:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;assets/images/2019-11-26-lessons-learnt-flow-ads-2019_1.png&quot; alt=&quot;img&quot; /&gt;
+&lt;small&gt;Architecture of the ADS 2019 app&lt;/small&gt;&lt;/p&gt;
+
+&lt;p&gt;Like many Android apps the ADS app lazily loads data from the network or a cache; we found this to be a perfect use case for &lt;code class=&quot;highlighter-rouge&quot;&gt;Flow&lt;/code&gt;. For one shot operations, &lt;a href=&quot;https://medium.com/androiddevelopers/coroutines-on-android-part-iii-real-work-2ba8a2ec2f45&quot;&gt;suspend functions&lt;/a&gt; were a better fit. There are two main commits that refactor the app to use Coroutines. The &lt;a href=&quot;https://github.com/google/iosched/pull/333/commits/5f5115e21f1cb008b1a6c1d6130104a86f20904b&quot;&gt;first commit&lt;/a&gt; migrates one-shot operations, and the &lt;a href=&quot;https://github.com/google/iosched/pull/333/commits/643e531d00884291d79c6742601e2bd53b9f2ee4&quot;&gt;second one&lt;/a&gt; migrates to data streams.&lt;/p&gt;
+
+&lt;h2 id=&quot;1-prefer-exposing-streams-as-flows-not-channels&quot;&gt;1. Prefer exposing streams as Flows (not Channels)&lt;/h2&gt;
+
+&lt;p&gt;There are two ways you can deal with streams of data in coroutines: the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-flow/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Flow&lt;/code&gt; API&lt;/a&gt; and the &lt;a href=&quot;https://kotlinlang.org/docs/reference/coroutines/channels.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Channel&lt;/code&gt; API&lt;/a&gt;. Channels are a synchronisation primitive whereas Flow is built to model streams of data: it’s a factory for subscriptions to streams of data. Channels can however be used to back a Flow, as we’ll see later.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Prefer exposing Flow since it gives you more flexibility, more explicit contracts and operators than Channel&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Flows automatically close the stream of data due to the nature of the terminal operators which trigger the execution of the stream of data and complete successfully or exceptionally depending on all the flow operations in the producer side. Therefore, you can’t (nearly as easily) leak resources on the producer side. This is easier to do with Channels: the producer might not clean up heavy resources if the &lt;code class=&quot;highlighter-rouge&quot;&gt;Channel&lt;/code&gt; is not closed properly.&lt;/p&gt;
+
+&lt;p&gt;The data layer of an app is responsible for providing data usually by reading from a database or fetching from the Internet. For example &lt;a href=&quot;https://github.com/google/iosched/blob/adssched/shared/src/main/java/com/google/samples/apps/iosched/shared/data/userevent/UserEventDataSource.kt&quot;&gt;here’s a DataSource interface that exposes a stream of user event data&lt;/a&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserEventDataSource&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;getObservableUserEvent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;String&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;):&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;UserEventResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;2-how-to-use-flow-in-your-android-app-architecture&quot;&gt;2. How to use Flow in your Android app architecture&lt;/h2&gt;
+
+&lt;h3 id=&quot;usecase-and-repository&quot;&gt;UseCase and Repository&lt;/h3&gt;
+
+&lt;p&gt;The layers in-between View/ViewModel and the DataSource (i.e. UseCase and Repository in our case) often need to combine data from multiple queries or transform the data before it can be used by the ViewModel layer. Just like &lt;a href=&quot;https://kotlinlang.org/docs/reference/sequences.html&quot;&gt;Kotlin sequences&lt;/a&gt;, Flow supports a large set of operators to transform your data. There are a &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-flow/#extension-functions&quot;&gt;wealth of operators already available&lt;/a&gt;, or you can create your own transformation (e.g. using the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/transform.html&quot;&gt;transform&lt;/a&gt; operator). However, Flow exposes suspend lambdas on many of the operators, there’s often no need to make a custom transform to accomplish complex tasks, just call suspend functions from inside your Flow.&lt;/p&gt;
+
+&lt;p&gt;In our ADS example, we want to combine the &lt;code class=&quot;highlighter-rouge&quot;&gt;UserEventResult&lt;/code&gt; with session data in the &lt;a href=&quot;https://github.com/google/iosched/blob/adssched/shared/src/main/java/com/google/samples/apps/iosched/shared/data/userevent/DefaultSessionAndUserEventRepository.kt&quot;&gt;Repository layer&lt;/a&gt;. We use the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/map.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;map&lt;/code&gt;&lt;/a&gt; operator to apply a suspend lambda to each value of the Flow retrieved from DataSource:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;cm&quot;&gt;/* Copyright 2019 Google LLC.   &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   SPDX-License-Identifier: Apache-2.0 */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;DefaultSessionAndUserEventRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;userEventDataSource&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserEventDataSource&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;sessionRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SessionRepository&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SessionAndUserEventRepository&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;getObservableUserEvent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;userId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;String&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;?,&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;eventId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SessionId&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;):&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;LoadUserSessionUseCaseResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// Handles null userId&lt;/span&gt;
+
+        &lt;span class=&quot;c1&quot;&gt;// Observes the user events and merges them with session data&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;userEventDataSource&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;getObservableUserEvent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;eventId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;map&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;userEventResult&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+            &lt;span class=&quot;c1&quot;&gt;// lambda of the map operator that can call suspend functions&lt;/span&gt;
+            &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;event&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;sessionRepository&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;getSession&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;eventId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+            &lt;span class=&quot;c1&quot;&gt;// Merges session with user data and emits the result&lt;/span&gt;
+            &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;userSession&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserSession&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;event&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;userEventResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userEvent&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;?:&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;createDefaultUserEvent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;event&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+            &lt;span class=&quot;nc&quot;&gt;Result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Success&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;LoadUserSessionUseCaseResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userSession&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;viewmodel&quot;&gt;ViewModel&lt;/h3&gt;
+
+&lt;p&gt;When performing UI ↔ ViewModel communication with LiveData, the ViewModel layer should consume the stream of data coming from the data layer using a terminal operator (e.g. &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-flow/collect.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;collect&lt;/code&gt;&lt;/a&gt;, &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/first.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;first&lt;/code&gt;&lt;/a&gt; or &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/to-list.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;toList&lt;/code&gt;&lt;/a&gt;).&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;cm&quot;&gt;/* Copyright 2019 Google LLC.   &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   SPDX-License-Identifier: Apache-2.0 */&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;// Simplified version of the real code&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SessionDetailViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;loadUserSessionUseCase&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;LoadUserSessionUseCase&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;):&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;listenForUserSessionChanges&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;sessionId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SessionId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;viewModelScope&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;launch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;nf&quot;&gt;loadUserSessionUseCase&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;sessionId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;collect&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;loadResult&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+                &lt;span class=&quot;c1&quot;&gt;// Update multiple LiveDatas to notify the View&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;&lt;em&gt;See full code &lt;a href=&quot;https://github.com/google/iosched/blob/adssched/mobile/src/main/java/com/google/samples/apps/iosched/ui/sessiondetail/SessionDetailViewModel.kt&quot;&gt;here&lt;/a&gt;.&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;If you’re converting a Flow to a LiveData, you can use the &lt;a href=&quot;https://developer.android.com/reference/kotlin/androidx/lifecycle/package-summary#aslivedata&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Flow.asLiveData()&lt;/code&gt;&lt;/a&gt; extension function from the &lt;a href=&quot;https://mvnrepository.com/artifact/androidx.lifecycle/lifecycle-livedata-ktx?repo=google&quot;&gt;androidX lifecycle LiveData ktx library&lt;/a&gt;. This is very convenient since it will share a single underlying subscription to the Flow and will manage the subscription based on the observers’ lifecycles. Moreover, LiveData also keeps the most recent value for late-coming observers and the subscription active across configuration changes. Check this simpler code that showcases how you can use the extension function:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SimplifiedSessionDetailViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;loadUserSessionUseCase&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;LoadUserSessionUseCase&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;):&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewModel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+  &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;sessions&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;loadUserSessionUseCase&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;sessionId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;asLiveData&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;&lt;em&gt;Disclaimer&lt;/em&gt;: The code snippet above is not part of the app; it’s a simplified version of the code that showcases how you can use &lt;code class=&quot;highlighter-rouge&quot;&gt;Flow.asLiveData()&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;3-when-to-use-a-broadcastchannel-or-flow-as-an-implementation-detail&quot;&gt;3. When to use a BroadcastChannel or Flow as an implementation detail&lt;/h2&gt;
+
+&lt;p&gt;Back to the DataSource implementation, how can we implement the &lt;code class=&quot;highlighter-rouge&quot;&gt;getObservableUserEvent&lt;/code&gt; function we exposed above? The team considered two alternatives implementations: the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-flow/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;flow&lt;/code&gt;&lt;/a&gt; builder or the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.channels/-broadcast-channel/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt;&lt;/a&gt; API. Each serve different use cases.&lt;/p&gt;
+
+&lt;h3 id=&quot;when-to-use-flow&quot;&gt;When to use Flow&lt;/h3&gt;
+
+&lt;p&gt;Flow is a &lt;em&gt;cold stream&lt;/em&gt;. A cold stream is a data source whose producer will execute for each listener that starts consuming events, resulting in a new stream of data being created on each subscription. Once the consumer stops listening or the producer block finishes, the stream of data will be closed automatically.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Flow is a great fit when the production of data needs to start/stop to match the observer&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;You can emit a limited or unlimited number of elements using the flow builder.&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;oneElementFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;flow&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// producer block starts here, stream starts&lt;/span&gt;
+  &lt;span class=&quot;nf&quot;&gt;emit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// producer block finishes here, stream will be closed&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;unlimitedElementFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;flow&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// producer block starts here, stream starts&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;while&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Do calculations&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;emit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;delay&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;c1&quot;&gt;// producer block finishes here, stream will be closed&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Flow tends to be used for expensive tasks as it provides automatic cleanup via coroutine cancellation. Notice that this cancellation is cooperative, a flow that never suspends can never be cancelled: in our example, since &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/delay.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;delay&lt;/code&gt;&lt;/a&gt; is a suspend function that checks for cancellation, when the subscriber stops listening, the Flow will stop and cleanup resources.&lt;/p&gt;
+
+&lt;h3 id=&quot;when-to-use-broadcastchannel&quot;&gt;When to use BroadcastChannel&lt;/h3&gt;
+
+&lt;p&gt;A &lt;code class=&quot;highlighter-rouge&quot;&gt;Channel&lt;/code&gt; is a &lt;a href=&quot;https://kotlinlang.org/docs/reference/coroutines/channels.html&quot;&gt;concurrency primitive&lt;/a&gt; for communicating between coroutines. A &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.channels/-broadcast-channel/&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt;&lt;/a&gt; is an implementation of &lt;code class=&quot;highlighter-rouge&quot;&gt;Channel&lt;/code&gt; with multicast capabilities.&lt;/p&gt;
+
+&lt;p&gt;There are some cases where you might want to use an implementation of &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; in your data source layer:&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Use &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; when the producer(s) and consumer(s) have different lifetimes or operate completely independently of each other&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;The &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; API is the perfect fit when you want the producer to follow a different lifecycle and broadcast the current result to anyone who’s listening. In this way, the producer doesn’t need to start every time a new listener starts consuming events.&lt;/p&gt;
+
+&lt;p&gt;You can still expose a Flow to the caller, they don’t need to know about how this is implemented. You can use the extension function &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/as-flow.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel.asFlow()&lt;/code&gt;&lt;/a&gt; to expose a &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; as a Flow.&lt;/p&gt;
+
+&lt;p&gt;However, closing that Flow won’t cancel the subscription. When using &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt;, you have to take care of its lifecycle. They don’t know if there are listeners or not, and will keep resources alive until the &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; is cancelled or closed. Make sure to close the &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; when it’s no longer needed. Also, remember that a closed channel cannot be active again, you’d need to create a new instance.&lt;/p&gt;
+
+&lt;p&gt;An example of how to use the &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; API can be found in the next section.&lt;/p&gt;
+
+&lt;h3 id=&quot;disclaimer&quot;&gt;Disclaimer&lt;/h3&gt;
+
+&lt;p&gt;Parts of the Flow and &lt;code class=&quot;highlighter-rouge&quot;&gt;Channel&lt;/code&gt; APIs are still in experimental, they’re likely to change. There are some situations where you would currently use Channels but the recommendation in the future may change to use Flow. Specifically, the &lt;code class=&quot;highlighter-rouge&quot;&gt;StateFlow&lt;/code&gt; and Flow’s share operator proposals may reduce the usage of Channel in the future.&lt;/p&gt;
+
+&lt;h2 id=&quot;4-convert-data-streams-callback-based-apis-to-coroutines&quot;&gt;4. Convert data streams callback-based APIs to Coroutines&lt;/h2&gt;
+
+&lt;p&gt;Multiple libraries already support coroutines for data streams operations, including &lt;a href=&quot;https://developer.android.com/jetpack/androidx/releases/room&quot;&gt;Room&lt;/a&gt;. For those that don’t, you can convert &lt;em&gt;any&lt;/em&gt; callback-based API to Coroutines.&lt;/p&gt;
+
+&lt;h3 id=&quot;flow-implementation&quot;&gt;Flow implementation&lt;/h3&gt;
+
+&lt;p&gt;If you want to convert a stream callback-based API to use Flow, you can use the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/channel-flow.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;channelFlow&lt;/code&gt;&lt;/a&gt; function (also &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/callback-flow.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;callbackFlow&lt;/code&gt;&lt;/a&gt;, which shares the same implementation). &lt;code class=&quot;highlighter-rouge&quot;&gt;channelFlow&lt;/code&gt; creates an instance of a Flow whose elements are sent to a Channel. This allows us to provide elements running in a different context or concurrently.&lt;/p&gt;
+
+&lt;p&gt;In the following sample, we want to emit the elements that we get from a callback into a Flow:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;Create a flow with the &lt;code class=&quot;highlighter-rouge&quot;&gt;channelFlow&lt;/code&gt; builder that registers a callback to a third party library.&lt;/li&gt;
+  &lt;li&gt;Emit all items received from the callback to the Flow.&lt;/li&gt;
+  &lt;li&gt;When the subscriber stops listening, we unregister the subscription to the API using the suspend fun &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.channels/await-close.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;awaitClose&lt;/code&gt;&lt;/a&gt;.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;cm&quot;&gt;/* Copyright 2019 Google LLC.   &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   SPDX-License-Identifier: Apache-2.0 */&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;getObservableUserEvent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;String&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;eventId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SessionId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;):&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;UserEventResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// 1) Create Flow with channelFlow&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;channelFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;UserEventResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+        &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;eventDocument&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;firestore&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;collection&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;USERS_COLLECTION&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;document&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;collection&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;EVENTS_COLLECTION&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;document&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;eventId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    
+        &lt;span class=&quot;c1&quot;&gt;// 1) Register callback to the API&lt;/span&gt;
+        &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;subscription&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;eventDocument&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;addSnapshotListener&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;snapshot&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;_&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+            &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;userEvent&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;snapshot&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;exists&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;nf&quot;&gt;parseUserEvent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;snapshot&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;null&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+            &lt;span class=&quot;c1&quot;&gt;// 2) Send items to the Flow&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;channel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;offer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;UserEventResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userEvent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+        &lt;span class=&quot;c1&quot;&gt;// 3) Don't close the stream of data, keep it open until the consumer&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// stops listening or the API calls onCompleted or onError. &lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// When that happens, cancel the subscription to the 3P library&lt;/span&gt;
+        &lt;span class=&quot;nf&quot;&gt;awaitClose&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;subscription&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;remove&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;&lt;em&gt;See full code &lt;a href=&quot;https://github.com/google/iosched/blob/adssched/shared/src/main/java/com/google/samples/apps/iosched/shared/data/userevent/FirestoreUserEventDataSource.kt&quot;&gt;here&lt;/a&gt;.&lt;/em&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;broadcastchannel-implementation&quot;&gt;BroadcastChannel implementation&lt;/h3&gt;
+
+&lt;p&gt;For our stream of data that tracks user authentication with Firestore, we used the &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; API as we want to register one Authentication listener that follows a different lifecycle and broadcasts the current result to anyone who’s listening.&lt;/p&gt;
+
+&lt;p&gt;To convert a callback API to &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; you need a bit more code than with Flow. You can create a class where the instance of the &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; can be kept in a variable. During initialisation, register the callback that sends elements to the &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; as before:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;cm&quot;&gt;/* Copyright 2019 Google LLC.   &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   SPDX-License-Identifier: Apache-2.0 */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FirebaseAuthStateUserDataSource&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;..&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AuthStateUserDataSource&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;channel&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ConflatedBroadcastChannel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;AuthenticatedUserInfo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&amp;gt;()&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;listener&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;FirebaseAuth&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Unit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;auth&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;-&amp;gt;&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// Data processing logic&lt;/span&gt;
+
+        &lt;span class=&quot;c1&quot;&gt;// Send the current user for observers&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(!&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;channel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;isClosedForSend&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;channel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;offer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Success&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;FirebaseUserInfo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;auth&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;currentUser&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)))&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;nf&quot;&gt;unregisterListener&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    
+    &lt;span class=&quot;nd&quot;&gt;@Synchronized&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;getBasicUserInfo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;():&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;Result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;AuthenticatedUserInfo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(!&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;isListening&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;firebase&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;addAuthStateListener&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;listener&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;isListening&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;true&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;channel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;asFlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;&lt;em&gt;See full code &lt;a href=&quot;https://github.com/google/iosched/blob/adssched/mobile/src/main/java/com/google/samples/apps/iosched/shared/data/signin/datasources/FirebaseAuthStateUserDataSource.kt&quot;&gt;here&lt;/a&gt;.&lt;/em&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;5-testing-tips&quot;&gt;5. Testing tips&lt;/h2&gt;
+
+&lt;p&gt;To &lt;strong&gt;test Flow transformations&lt;/strong&gt; (as we do in the UseCase and Repository layers), you can use the &lt;code class=&quot;highlighter-rouge&quot;&gt;flow&lt;/code&gt; builder to return fake data. For example:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;cm&quot;&gt;/* Copyright 2019 Google LLC.&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;   SPDX-License-Identifier: Apache-2.0 */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;object&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FakeUserEventDataSource&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;UserEventDataSource&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;override&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;getObservableUserEvents&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;String&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;flow&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nf&quot;&gt;emit&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;UserEventsResult&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;userEvents&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;DefaultSessionAndUserEventRepositoryTest&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;nd&quot;&gt;@Test&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;observableUserEvents_areMappedCorrectly&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;runBlockingTest&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Prepare repo&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;userEvents&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;repository&lt;/span&gt;
+          &lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;getObservableUserEvents&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;user&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Assert user events&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To &lt;strong&gt;test implementations of Flow&lt;/strong&gt; successfully, a good idea is to use the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/take.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;take&lt;/code&gt;&lt;/a&gt; operator to get some items from the Flow and the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/to-list.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;toList&lt;/code&gt;&lt;/a&gt; operator as the terminal operator to get the results in a list. See an example of this in the following test:&lt;/p&gt;
+
+&lt;div class=&quot;language-kotlin highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;AnotherStreamDataSourceImplTest&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;nd&quot;&gt;@Test&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;fun&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;`Test&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;happy&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;path`&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;runBlockingTest&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Prepare subject&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;py&quot;&gt;result&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;subject&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;flow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;take&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;toList&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Assert expected result&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The &lt;code class=&quot;highlighter-rouge&quot;&gt;take&lt;/code&gt; operator is a great fit to close the Flow after you get the items. Not closing a started Flow (or &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt;) after each test will leak memory and creates a flaky and inconsistent test suite.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Note&lt;/strong&gt;: If the implementation of the DataSource is done with a &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt;, the code above is not enough. You have to manage its lifecycle by making sure you start the &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt; before the test and close it after the test finishes. If not, you’ll leak memory. You can see a &lt;a href=&quot;https://github.com/manuelvicnt/MathCoroutinesFlow/blob/master/app/src/test/java/com/manuelvicnt/coroutinesflow/fibonacci/impl/NeverEndingFibonacciProducerTest.kt#L38&quot;&gt;test like this in this other Flow sample&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Testing Coroutines best practices also apply here. If you create a new coroutine in code under test, you might want to execute it in your test thread for a deterministic execution of your test. Check out more about this in the &lt;a href=&quot;https://youtu.be/KMb0Fs8rCRs?t=416&quot;&gt;Testing Coroutines ADS 2019 talk&lt;/a&gt;.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;h2 id=&quot;summary&quot;&gt;Summary&lt;/h2&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;Prefer exposing Flow to consumers rather than &lt;code class=&quot;highlighter-rouge&quot;&gt;Channel&lt;/code&gt; because of all the explicit contracts and operators Flow provides.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;With Flow, the producer block will get executed every time there’s a new listener and the lifecycle of the stream of data will be handled automatically.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;With &lt;code class=&quot;highlighter-rouge&quot;&gt;BroadcastChannel&lt;/code&gt;, you can share the producer but you have to manage its lifecycle yourself.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Consider converting callback-based APIs to coroutines for a better and more idiomatic integration of the APIs within your app.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Easily test implementations of Flow by using the &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/take.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;take&lt;/code&gt;&lt;/a&gt; and &lt;a href=&quot;https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/to-list.html&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;toList&lt;/code&gt;&lt;/a&gt; operators.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">Best practices we found when using Flow in the ADS 2019 app</summary>
+      
+
+      
+      
+    </entry>
+  
+    <entry>
+      <title type="html">Testing coroutines - Android Developer Summit 2019</title>
+      <link href="https://manuelvivo.dev/testing-coroutines-talk" rel="alternate" type="text/html" title="Testing coroutines - Android Developer Summit 2019" />
+      <published>2019-10-24T00:00:01+00:00</published>
+      <updated>2019-10-24T00:00:01+00:00</updated>
+      <id>https://manuelvivo.dev/testing-coroutines-talk</id>
+      <content type="html" xml:base="https://manuelvivo.dev/testing-coroutines-talk">&lt;p&gt;How to test coroutines in 2019!&lt;/p&gt;
+
+&lt;h3 id=&quot;abstract&quot;&gt;Abstract&lt;/h3&gt;
+
+&lt;p&gt;Coroutines simplify the way we do async programming on Android. However, testing async code has never been an easy task. In this talk, we show you how to master testing asynchronicity with coroutines to get that precious green check ✔️. Which questions do you have to ask yourself before writing a line of test code? How can you test coroutines that use Dispatchers.Main? What if you want to control the timing of your events? Why shouldn’t you use Dispatchers.Unconfined? Come and learn how to test coroutines like a pro.&lt;/p&gt;
+
+&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/KMb0Fs8rCRs&quot; frameborder=&quot;0&quot; allow=&quot;accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+
+&lt;h3 id=&quot;presenters&quot;&gt;Presenters&lt;/h3&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://twitter.com/objcode&quot;&gt;Sean McQuillan&lt;/a&gt; is a Developer Advocate at Google. With a decade of experience at Twilio and other San Francisco startups he is knowledgeable about building apps that scale. Sean is passionate about using great tooling to build high quality apps - quickly. When he is not working on Android you can find him fiddling on the piano or crocheting hats.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://twitter.com/manuelvicnt&quot;&gt;Manuel&lt;/a&gt; is an Android Developer Relations Engineer at Google. With previous experience at Capital One, he currently focuses on App Architecture, Kotlin &amp;amp; Coroutines, Dependency Injection and Jetpack Compose.&lt;/p&gt;</content>
+
+      
+      
+      
+      
+      
+
+      <author>
+          <name>Manuel Vivo</name>
+        
+        
+      </author>
+
+      
+
+      
+        <category term="talks" />
+      
+        <category term="coroutines" />
+      
+
+      
+        <summary type="html">How to test coroutines in 2019!</summary>
+      
+
+      
+      
+    </entry>
+  
+</feed>
